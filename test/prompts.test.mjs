@@ -175,6 +175,21 @@ test('applies user visual overrides across every scene', () => {
   assert.equal(buildStyleBible({ creative: { visualOverrides: { palette: 'Steel blue' } } }).userOverrides.palette, 'Steel blue');
 });
 
+test('derives a breath-led cosmic profile from meditation lyrics', () => {
+  const scenes = generateScenePrompts({
+    sections: [
+      { id: 'outward', label: 'verse', startSeconds: 0, endSeconds: 20 },
+      { id: 'cosmos', label: 'bridge', startSeconds: 20, endSeconds: 40 },
+      { id: 'return', label: 'outro', startSeconds: 40, endSeconds: 60 }
+    ],
+    creative: { lyrics: 'Breathe deeply through your nose. Follow this silver thread through the atmosphere to the universe. Return along the same thread.' }
+  });
+  assert.match(scenes[0].narrative.subject, /meditator/);
+  assert.match(scenes[0].narrative.anchor, /silver thread/);
+  assert.match(scenes[1].narrative.spatialRule, /identical route/);
+  assert.match(scenes[2].prompt, /rainbow color/);
+});
+
 test('builds a reusable style bible from creative intent', () => {
   const bible = buildStyleBible({ creative: { brief: 'A surreal night journey.', visualStyle: 'Neon dreamscape.' } });
   assert.equal(bible.visualThesis, 'A surreal night journey.');

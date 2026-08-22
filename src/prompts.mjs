@@ -73,6 +73,8 @@ function inferNarrativeMotifs(lines) {
   if (/\bfairy\b|\bdream\b|\bmagic\b/.test(text)) motifs.push({ name: 'a surreal escape or wish image', direction: 'foreshadow it in grounded details before allowing it to break reality' });
   if (/\bbacon\b|\bmustache\b|\bmoustache\b|\bstylist\b|\bnickel\b|\bconditioner\b|\bgrease\b/.test(text)) motifs.push({ name: 'a five-cent mustache makeover and bacon-grease reveal', direction: 'plant the cheap makeover details early, then pay them off as the comic reveal' });
   if (/\bsun\b|\bsky\b|\bclouds?\b|\bwalking\b|\bfree\b|\bfavorite song\b|\bgood day\b/.test(text)) motifs.push({ name: 'a bright day becoming a private music-video world', direction: 'repeat ordinary places while increasing color, motion, and shared musical energy' });
+  if (/\bmeditat(?:e|ion|ing)\b|\bbreathe\b|\bbreath\b|\brelax(?:ing)?\b|\bquiet place\b|\bclose your eyes\b/.test(text)) motifs.push({ name: 'a breath-led inward-to-cosmic meditation', direction: 'let each inhale and exhale produce a visible, measured change in scale and motion' });
+  if (/\bsilver thread\b|\bthread(?:s)?\b|\brope of existence\b|\buniverse\b|\bgalaxy\b|\batmosphere\b/.test(text)) motifs.push({ name: 'a silver thread joining the body to a breathing cosmos', direction: 'keep one continuous thread as the geographic and emotional axis from departure through return' });
   return motifs;
 }
 
@@ -116,6 +118,16 @@ function baseNarrativeProfile({ motifs, creative }) {
       wardrobe: 'the yellow windbreaker, red headphones, white sneakers, and blue daypack; never change the silhouette between sections',
       spatialRule: 'begin at street level, widen into the park and bridge, then rise to the rooftop; keep the traveler moving toward the sun until the final return',
       palette: 'morning blue, cloud white, warm yellow, leaf green, and a small red accent from the headphones'
+    };
+  }
+  if (names.has('a breath-led inward-to-cosmic meditation') && names.has('a silver thread joining the body to a breathing cosmos')) {
+    return {
+      subject: 'a calm meditator in loose ivory linen, first seen in a quiet resting body and later as a luminous human silhouette',
+      setting: 'a dim quiet room that opens through the ground, atmosphere, stars, galaxy, and outer universe before returning along the same path',
+      anchor: 'one silver thread rising from just below the navel, a multicolored rope of existence, and the visible pulse of each breath',
+      wardrobe: 'loose ivory linen with no changes during the outward journey; add only a subtle spectrum tint to the silhouette on the return',
+      spatialRule: 'travel outward along the single silver thread from body to cosmos, expand at the rope, then descend along the identical route back into the body',
+      palette: 'soft silver, midnight blue, violet, deep space black, and restrained rainbow color that appears only after renewal'
     };
   }
   if (names.has('money and status anxiety')) {
