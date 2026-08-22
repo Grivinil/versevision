@@ -52,7 +52,58 @@ const NARRATIVE_DIRECTION = {
   outro: { role: 'resolution or suspended ending', state: 'the protagonist reaches a changed emotional state, even if the plot remains open', action: 'leave a final image that resolves or deliberately suspends the central want' }
 };
 
-function narrativeDirectionFor(label, index, total) {
+const MODE_NARRATIVE_DIRECTION = {
+  meditation: {
+    preparation: { role: 'grounding preparation', state: 'the body settles and attention turns inward', action: 'anchor posture, breath, and stillness in a concrete physical action' },
+    ascent: { role: 'outward ascent', state: 'attention leaves the ordinary room and follows the central thread outward', action: 'translate each breath into measured movement away from the body while preserving the central visual anchor' },
+    expansion: { role: 'cosmic expansion', state: 'the central image reaches its widest scale and changes the meaning of the journey', action: 'expand the world beyond human scale without losing the original body-to-cosmos connection' },
+    integration: { role: 'breath integration', state: 'breath and the central image pulse as one connected system', action: 'make inhale and exhale produce visible contraction and release in the recurring image' },
+    descent: { role: 'return descent', state: 'attention retraces the established route toward the body', action: 'reverse the outward path with the same landmarks and a slower, gentler visual rhythm' },
+    resolution: { role: 'reintegrated resolution', state: 'the listener returns to the body carrying a changed relationship to the wider world', action: 'end with a calm physical re-entry and one retained trace of the journey' }
+  },
+  spoken_word: {
+    setup: { role: 'spoken premise', state: 'the central idea is introduced through a concrete human situation', action: 'stage the premise through one decisive observation or action rather than illustrating every word literally' },
+    development: { role: 'spoken development', state: 'the idea gains specificity as the subject tests it against lived detail', action: 'turn the speaker\'s next point into a visible choice, object, or change in behavior' },
+    turn: { role: 'spoken turn', state: 'the audience\'s understanding shifts when a contradiction or revelation appears', action: 'reframe the established subject, object, or location so the spoken idea acquires a new consequence' },
+    resolution: { role: 'spoken resolution', state: 'the idea lands in a memorable image or unresolved question', action: 'leave one precise final image that carries the argument beyond the last line' }
+  },
+  cinematic_narration: {
+    setup: { role: 'cinematic setup', state: 'the world, subject, and inciting question are legible before the plot accelerates', action: 'establish geography and character behavior with a visually specific opening beat' },
+    development: { role: 'cinematic development', state: 'the subject pursues a goal while the world introduces a concrete obstacle', action: 'make each narrated detail alter blocking, props, or the subject\'s next decision' },
+    revelation: { role: 'cinematic revelation', state: 'a hidden relationship or fact changes how the audience reads the established world', action: 'recontextualize a recurring motif without changing the subject\'s identity or continuity anchors' },
+    escalation: { role: 'cinematic escalation', state: 'the consequence becomes unavoidable and the subject must commit', action: 'increase scale, risk, and visual pressure while preserving the established geography and props' },
+    resolution: { role: 'cinematic resolution', state: 'the central question resolves or remains deliberately suspended in a final image', action: 'pay off the strongest recurring motif and end on a clear emotional consequence' }
+  }
+};
+
+function modeNarrativeDirection(mode, index, total) {
+  const progress = total <= 1 ? 1 : index / (total - 1);
+  if (mode === 'meditation') {
+    if (index === 0) return MODE_NARRATIVE_DIRECTION.meditation.preparation;
+    if (index === total - 1) return MODE_NARRATIVE_DIRECTION.meditation.resolution;
+    if (progress <= 0.25) return MODE_NARRATIVE_DIRECTION.meditation.ascent;
+    if (progress <= 0.5) return MODE_NARRATIVE_DIRECTION.meditation.expansion;
+    if (progress <= 0.75) return MODE_NARRATIVE_DIRECTION.meditation.integration;
+    return MODE_NARRATIVE_DIRECTION.meditation.descent;
+  }
+  if (mode === 'spoken_word') {
+    if (index === 0) return MODE_NARRATIVE_DIRECTION.spoken_word.setup;
+    if (index === total - 1) return MODE_NARRATIVE_DIRECTION.spoken_word.resolution;
+    return progress < 0.5 ? MODE_NARRATIVE_DIRECTION.spoken_word.development : MODE_NARRATIVE_DIRECTION.spoken_word.turn;
+  }
+  if (mode === 'cinematic_narration') {
+    if (index === 0) return MODE_NARRATIVE_DIRECTION.cinematic_narration.setup;
+    if (index === total - 1) return MODE_NARRATIVE_DIRECTION.cinematic_narration.resolution;
+    if (progress < 0.34) return MODE_NARRATIVE_DIRECTION.cinematic_narration.development;
+    if (progress < 0.67) return MODE_NARRATIVE_DIRECTION.cinematic_narration.revelation;
+    return MODE_NARRATIVE_DIRECTION.cinematic_narration.escalation;
+  }
+  return null;
+}
+
+function narrativeDirectionFor(label, index, total, mode = 'song') {
+  const modeDirection = modeNarrativeDirection(mode, index, total);
+  if (modeDirection) return modeDirection;
   if (index === 0) return NARRATIVE_DIRECTION.intro;
   if (index === total - 1) return label === 'outro' ? NARRATIVE_DIRECTION.outro : NARRATIVE_DIRECTION.chorus;
   if (label === 'bridge') return NARRATIVE_DIRECTION.bridge;
@@ -208,8 +259,8 @@ function lyricProvenance(line) {
   return 'default_proposal';
 }
 
-function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, creative, previous, globalMotifs }) {
-  const direction = narrativeDirectionFor(section.label, index, total);
+function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, creative, previous, globalMotifs, narrativeMode = 'song' }) {
+  const direction = narrativeDirectionFor(section.label, index, total, narrativeMode);
   const lyricLines = lyricReferences.map((line) => line.text).filter(Boolean);
   const motifs = inferNarrativeMotifs(lyricLines);
   const profile = narrativeProfile({ motifs: globalMotifs?.length ? globalMotifs : motifs, creative });
@@ -262,7 +313,8 @@ function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, c
     camera: profile.camera,
     provenance: {
       ...provenance,
-      lyricHooks: lyricLines.length ? 'user_supplied' : 'default_proposal'
+      lyricHooks: lyricLines.length ? 'user_supplied' : 'default_proposal',
+      narrativeMode: creative.narrativeMode ? 'user_supplied' : 'default_proposal'
     }
   };
 }
@@ -309,15 +361,17 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
   const mood = Array.isArray(creative.mood) && creative.mood.length ? creative.mood.join(', ') : 'follow the emotional movement of the track';
   const genre = Array.isArray(creative.genre) && creative.genre.length ? creative.genre.join(', ') : 'music video';
   const aspectRatio = output.aspectRatio || '16:9';
+  const narrativeMode = creative.narrativeMode || 'song';
   const globalMotifs = inferNarrativeMotifs(providedLyricLines(creative.lyrics));
   let previousBeat = null;
   return sections.map((section, index) => {
-    const direction = narrativeDirectionFor(section.label, index, sections.length);
+    const visualDirection = directionFor(section.label);
     const sceneId = `scene_${String(index + 1).padStart(2, '0')}`;
     const continuityRefs = ['character_01', 'location_01', 'style_01'];
     const lyricMoments = lyricMomentsFor(section, analysis.lyricAlignment);
     const lyricReferences = lyricReferencesFor({ section, sectionIndex: index, sections, lyrics: creative.lyrics, alignment: analysis.lyricAlignment });
-    const narrative = buildNarrativeBeat({ sceneId, section, index, total: sections.length, lyricReferences, creative, previous: previousBeat, globalMotifs });
+    const narrative = buildNarrativeBeat({ sceneId, section, index, total: sections.length, lyricReferences, creative, previous: previousBeat, globalMotifs, narrativeMode });
+    const modePrompt = `Narrative mode: ${narrativeMode}. Use this mode's arc language and pacing while preserving the supplied subject, lyrics, and continuity anchors.`;
     const narrativePrompt = `Narrative continuity: ${narrative.continuityFrom ? `continue from ${narrative.continuityFrom};` : 'begin the story;'} Arc role: ${narrative.arcRole}. Subject: ${narrative.subject}. Scene: ${narrative.scene} Character action: ${narrative.characterAction} State transition: ${narrative.stateBefore} → ${narrative.stateAfter}. ${narrative.carryForward}`;
     const narrativeSpecifics = `Wardrobe continuity: ${narrative.wardrobe}. Spatial continuity: ${narrative.spatialRule}. Palette continuity: ${narrative.palette}. ${narrative.requiredProps.length ? `Required props: ${narrative.requiredProps.join(', ')}.` : ''} ${narrative.avoid.length ? `Avoid: ${narrative.avoid.join(', ')}.` : ''}`;
     const lyricCueText = lyricMoments.length
@@ -332,6 +386,7 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
       endSeconds: section.endSeconds,
       sectionId: section.id,
       sectionLabel: section.label,
+      narrativeMode,
       beatCues: beatCues(section, analysis.beatGrid),
       lyricMoments,
       lyricReferences,
@@ -342,12 +397,12 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
         lyricMoments: lyricMoments.map((moment) => moment.provenance),
         lyricReferences: lyricReferences.map((reference) => reference.provenance)
       },
-      intent: direction.intent,
-      prompt: `${direction.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${narrativePrompt} ${narrativeSpecifics} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
+      intent: visualDirection.intent,
+      prompt: `${visualDirection.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${modePrompt} ${narrativePrompt} ${narrativeSpecifics} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
       negativePrompt: [DEFAULT_NEGATIVE_PROMPT, ...narrative.avoid].join(', '),
-      camera: { shot: narrative.camera || direction.camera, movement: narrative.camera || direction.camera },
-      lighting: direction.lighting,
-      edit: { cutOnBeat: section.label === 'chorus' || section.label === 'pre-chorus', transition: direction.transition, lyricCueCount: lyricMoments.length, lyricReferenceCount: lyricReferences.length, lyricCuePolicy: 'confidence_gated_with_approximate_text_references' },
+      camera: { shot: narrative.camera || visualDirection.camera, movement: narrative.camera || visualDirection.camera },
+      lighting: visualDirection.lighting,
+      edit: { cutOnBeat: section.label === 'chorus' || section.label === 'pre-chorus', transition: visualDirection.transition, lyricCueCount: lyricMoments.length, lyricReferenceCount: lyricReferences.length, lyricCuePolicy: 'confidence_gated_with_approximate_text_references' },
       continuityRefs,
       confidence: section.confidence
     };

@@ -2,6 +2,7 @@ const REQUEST_SCHEMA = 'versevision/blueprint-request/v1';
 const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:5']);
 const GRANULARITIES = new Set(['coarse', 'standard', 'dense']);
 const GENERATOR_PROFILES = new Set(['generic']);
+const NARRATIVE_MODES = new Set(['song', 'spoken_word', 'meditation', 'cinematic_narration']);
 const AUDIO_MIME_TYPES = new Set(['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/x-m4a']);
 
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -101,7 +102,7 @@ function validateCreative(errors, creative) {
     add(errors, path, 'must be an object');
     return;
   }
-  rejectUnknown(errors, creative, new Set(['brief', 'lyrics', 'lyricsMode', 'genre', 'mood', 'visualStyle', 'referenceUrls', 'visualOverrides']), path);
+  rejectUnknown(errors, creative, new Set(['brief', 'lyrics', 'lyricsMode', 'genre', 'mood', 'visualStyle', 'referenceUrls', 'visualOverrides', 'narrativeMode']), path);
   validateString(errors, creative.brief, `${path}.brief`, { maxLength: 4000 });
   validateString(errors, creative.lyrics, `${path}.lyrics`, { maxLength: 20000 });
   if (creative.lyricsMode !== undefined && !['provided', 'auto_tag'].includes(creative.lyricsMode)) add(errors, `${path}.lyricsMode`, 'must be provided or auto_tag');
@@ -109,6 +110,7 @@ function validateCreative(errors, creative) {
   validateStringArray(errors, creative.genre, `${path}.genre`);
   validateStringArray(errors, creative.mood, `${path}.mood`);
   validateString(errors, creative.visualStyle, `${path}.visualStyle`, { maxLength: 2000 });
+  if (creative.narrativeMode !== undefined && !NARRATIVE_MODES.has(creative.narrativeMode)) add(errors, `${path}.narrativeMode`, 'must be song, spoken_word, meditation, or cinematic_narration');
   validateVisualOverrides(errors, creative.visualOverrides);
   if (creative.referenceUrls !== undefined) {
     if (!Array.isArray(creative.referenceUrls) || creative.referenceUrls.length > 8) {
@@ -172,4 +174,4 @@ export function validateBlueprintRequest(input) {
   return { ok: errors.length === 0, errors };
 }
 
-export { AUDIO_MIME_TYPES, REQUEST_SCHEMA };
+export { AUDIO_MIME_TYPES, NARRATIVE_MODES, REQUEST_SCHEMA };

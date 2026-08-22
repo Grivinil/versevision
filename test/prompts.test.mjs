@@ -190,6 +190,44 @@ test('derives a breath-led cosmic profile from meditation lyrics', () => {
   assert.match(scenes[2].prompt, /rainbow color/);
 });
 
+test('uses mode-specific narrative arcs without changing the visual contract', () => {
+  const sections = Array.from({ length: 6 }, (_, index) => ({
+    id: `section_${index + 1}`,
+    label: 'verse',
+    startSeconds: index * 10,
+    endSeconds: (index + 1) * 10,
+    confidence: 0.8
+  }));
+  const meditation = generateScenePrompts({ sections, creative: { narrativeMode: 'meditation', lyrics: 'Breathe and follow the thread.' } });
+  assert.deepEqual(meditation.map((scene) => scene.narrative.arcRole), [
+    'grounding preparation',
+    'outward ascent',
+    'cosmic expansion',
+    'breath integration',
+    'return descent',
+    'reintegrated resolution'
+  ]);
+  assert.ok(meditation.every((scene) => scene.narrativeMode === 'meditation' && typeof scene.intent === 'string' && scene.camera.shot));
+  assert.match(meditation[3].prompt, /Narrative mode: meditation/);
+
+  const spoken = generateScenePrompts({
+    sections: [
+      { id: 'one', label: 'intro', startSeconds: 0, endSeconds: 10 },
+      { id: 'two', label: 'verse', startSeconds: 10, endSeconds: 20 },
+      { id: 'three', label: 'bridge', startSeconds: 20, endSeconds: 30 },
+      { id: 'four', label: 'outro', startSeconds: 30, endSeconds: 40 }
+    ],
+    creative: { narrativeMode: 'spoken_word', lyrics: 'Here is the premise. Then the turn. Finally, the question.' }
+  });
+  assert.deepEqual(spoken.map((scene) => scene.narrative.arcRole), ['spoken premise', 'spoken development', 'spoken turn', 'spoken resolution']);
+
+  const cinematic = generateScenePrompts({
+    sections: Array.from({ length: 5 }, (_, index) => ({ id: `cin_${index}`, label: 'verse', startSeconds: index * 8, endSeconds: (index + 1) * 8 })),
+    creative: { narrativeMode: 'cinematic_narration', lyrics: 'A question enters the world and changes everything.' }
+  });
+  assert.deepEqual(cinematic.map((scene) => scene.narrative.arcRole), ['cinematic setup', 'cinematic development', 'cinematic revelation', 'cinematic escalation', 'cinematic resolution']);
+});
+
 test('builds a reusable style bible from creative intent', () => {
   const bible = buildStyleBible({ creative: { brief: 'A surreal night journey.', visualStyle: 'Neon dreamscape.' } });
   assert.equal(bible.visualThesis, 'A surreal night journey.');

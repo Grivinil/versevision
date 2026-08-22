@@ -100,3 +100,12 @@ test('accepts bounded visual overrides and rejects oversized override lists', ()
   assert.equal(invalid.ok, false);
   assert.ok(invalid.errors.some((error) => error.path === 'creative.visualOverrides.requiredProps'));
 });
+
+test('accepts supported narrative modes and rejects unknown modes', () => {
+  for (const narrativeMode of ['song', 'spoken_word', 'meditation', 'cinematic_narration']) {
+    assert.equal(validateBlueprintRequest({ ...validRequest, creative: { ...validRequest.creative, narrativeMode } }).ok, true);
+  }
+  const invalid = validateBlueprintRequest({ ...validRequest, creative: { ...validRequest.creative, narrativeMode: 'podcast' } });
+  assert.equal(invalid.ok, false);
+  assert.ok(invalid.errors.some((error) => error.path === 'creative.narrativeMode'));
+});

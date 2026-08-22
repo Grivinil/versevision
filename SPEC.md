@@ -38,6 +38,7 @@ Both routes accept the same logical request. JSON requests use `source.kind = "u
     "brief": "A neon nocturnal city journey that becomes hopeful at the final chorus.",
     "lyrics": "Optional lyrics supplied by the user",
     "lyricsMode": "provided",
+    "narrativeMode": "song",
     "genre": ["electronic", "cinematic"],
     "mood": ["restless", "hopeful"],
     "visualStyle": "Anamorphic night photography, rain reflections, saturated cyan and amber.",
@@ -81,6 +82,9 @@ Both routes accept the same logical request. JSON requests use `source.kind = "u
 - `brief` is optional and limited to 4,000 characters.
 - `lyrics` is optional and limited to 20,000 characters.
 - `lyricsMode` is optional and must be `provided` or `auto_tag`; `auto_tag` requires `lyrics` and returns a reviewable inferred-tag copy.
+- `narrativeMode` is optional and defaults to `song`. Supported values are `song`, `spoken_word`, `meditation`, and
+  `cinematic_narration`; the mode changes scene-arc language and spoken-word timing guidance without changing the
+  audio or payment contract.
 - `alignment.mode` is optional and defaults to `provisional`. `acoustic` is accepted only when lyrics are supplied and is intended for the asynchronous alignment-job route.
 - `genre` and `mood` accept up to five strings each, with 80 characters per string.
 - `visualStyle` is optional and limited to 2,000 characters.
