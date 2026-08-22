@@ -1,0 +1,17 @@
+{
+  "name": "versevision",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Time-coded, generator-ready visual blueprints from music and creative intent.",
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "mpg123-decoder": "^1.0.3"
+  }
+}

@@ -1,0 +1,156 @@
+﻿import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildPreviewResponse, createVerseVisionServer } from '../src/server.mjs';
+
+test('builds the preview response from analysis without inventing scene data', () => {
+  const response = buildPreviewResponse({
+    id: 'vv_test',
+    input: { source: { kind: 'url', title: 'Test track' }, output: { sceneGranularity: 'standard' } },
+    analysis: {
+      source: { mimeType: 'audio/wav', durationSeconds: 16 },
+      analysis: {
+        bpm: { value: 120, confidence: 0.91 },
+        sections: [],
+        energyCurve: [{ timeSeconds: 0, value: 0.2 }],
+        confidence: 0.91
+      },
+      warnings: [{ code: 'sections_not_classified', message: 'Semantic labels are pending.' }]
+    }
+  });
+  assert.equal(response.schema, 'versevision/blueprint-preview/v1');
+  assert.equal(response.status, 'preview');
+  assert.equal(response.source.title, 'Test track');
+  assert.equal(response.analysisSummary.bpm.value, 120);
+  assert.equal(response.analysisSummary.sectionCount, 0);
+  assert.equal(response.analysisSummary.estimatedSceneCount, 2);
+  assert.equal(response.warnings.length, 1);
+  assert.equal(response.next.requiresPayment, true);
+});
+
+function makeSilentWav() {
+  const sampleRate = 8000;
+  const samples = Buffer.alloc(sampleRate * 2);
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0, 'ascii');
+  header.writeUInt32LE(36 + samples.length, 4);
+  header.write('WAVE', 8, 'ascii');
+  header.write('fmt ', 12, 'ascii');
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36, 'ascii');
+  header.writeUInt32LE(samples.length, 40);
+  return Buffer.concat([header, samples]);
+}
+
+test('preview route accepts multipart spec plus audio upload', async () => {
+  const server = createVerseVisionServer({ port: 0, host: '127.0.0.1' });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const form = new FormData();
+    form.append('spec', JSON.stringify({
+      schema: 'versevision/blueprint-request/v1',
+      source: { kind: 'upload', title: 'Uploaded track' },
+      creative: { lyrics: '[Verse 1]\nSun in the sky', lyricsMode: 'provided' },
+      output: { sceneGranularity: 'coarse' }
+    }));
+    form.append('audio', new Blob([makeSilentWav()], { type: 'audio/wav' }), 'track.wav');
+    const response = await fetch(`http://127.0.0.1:${address.port}/v1/blueprint/preview`, { method: 'POST', body: form });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.schema, 'versevision/blueprint-preview/v1');
+    assert.equal(body.source.title, 'Uploaded track');
+    assert.equal(body.source.mimeType, 'audio/wav');
+    assert.equal(body.analysisSummary.estimatedSceneCount, 1);
+    assert.equal(body.analysisSummary.lyricAlignment.lineCount, 1);
+    assert.equal(body.analysisSummary.lyricAlignment.sections[0].lines[0].words[0].text, 'Sun');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('preview never invokes remote acoustic alignment directly', async () => {
+  let calls = 0;
+  const server = createVerseVisionServer({ port: 0, host: '127.0.0.1', acousticAligner: async () => { calls += 1; return null; } });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const response = await fetch(`http://127.0.0.1:${address.port}/v1/blueprint/preview`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ schema: 'versevision/blueprint-request/v1', source: { kind: 'url', audioUrl: 'https://example.com/track.mp3' }, alignment: { mode: 'acoustic' }, creative: { lyrics: '[Verse 1]\nSun in the sky' } })
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.equal(body.error.code, 'acoustic_alignment_requires_job');
+    assert.equal(calls, 0);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('full blueprint remains explicitly gated by payment configuration', async () => {
+  const server = createVerseVisionServer({ port: 0, host: '127.0.0.1' });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const response = await fetch(`http://127.0.0.1:${address.port}/v1/blueprint`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    const body = await response.json();
+    assert.equal(response.status, 501);
+    assert.equal(body.error.code, 'blueprint_generation_pending');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('full blueprint route can be activated only with an injected payment verifier', async () => {
+  const server = createVerseVisionServer({ port: 0, host: '127.0.0.1', blueprintEnabled: true, paymentVerifier: async () => ({ ok: true }) });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const form = new FormData();
+    form.append('spec', JSON.stringify({ schema: 'versevision/blueprint-request/v1', source: { kind: 'upload', title: 'Paid blueprint test' } }));
+    form.append('audio', new Blob([makeSilentWav()], { type: 'audio/wav' }), 'track.wav');
+    const response = await fetch(`http://127.0.0.1:${address.port}/v1/blueprint`, { method: 'POST', body: form });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.schema, 'versevision/blueprint/v1');
+    assert.equal(body.status, 'complete');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('acoustic alignment jobs are opt-in and expose a pollable result', async () => {
+  const server = createVerseVisionServer({
+    port: 0,
+    host: '127.0.0.1',
+    alignmentJobsEnabled: true,
+    acousticAligner: async () => ({ mode: 'acoustic_forced', source: 'acoustic_forced_alignment', backend: 'acoustic_forced', confidence: 0.9, sections: [], lineCount: 0, wordCount: 0, warnings: [] })
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const form = new FormData();
+    form.append('spec', JSON.stringify({ schema: 'versevision/blueprint-request/v1', source: { kind: 'upload' }, alignment: { mode: 'acoustic' }, creative: { lyrics: '[Verse 1]\nSun in the sky', lyricsMode: 'provided' } }));
+    form.append('audio', new Blob([makeSilentWav()], { type: 'audio/wav' }), 'track.wav');
+    const createResponse = await fetch(`http://127.0.0.1:${address.port}/v1/alignment/jobs`, { method: 'POST', headers: { 'idempotency-key': 'server-job-1' }, body: form });
+    const created = await createResponse.json();
+    assert.equal(createResponse.status, 202);
+    assert.match(created.jobId, /^vv_align_/);
+    let status = created;
+    for (let attempt = 0; attempt < 100 && !['completed', 'failed'].includes(status.status); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      status = await (await fetch(`http://127.0.0.1:${address.port}/v1/alignment/jobs/${created.jobId}`)).json();
+    }
+    assert.equal(status.status, 'completed');
+    assert.equal(status.result.lyricAlignment.mode, 'acoustic_forced');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
