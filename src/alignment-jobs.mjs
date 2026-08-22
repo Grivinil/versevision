@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { analyzeAudioBufferAsync } from './audio.mjs';
 import { generateScenePrompts } from './prompts.mjs';
+import { buildLyricArtifacts } from './lrc.mjs';
 import { SupabaseAlignmentJobManager } from './alignment-jobs-supabase.mjs';
 
 const DEFAULT_MAX_QUEUE = 20;
@@ -116,10 +117,17 @@ export class AlignmentJobManager {
         analysis: analysis.analysis,
         output: job.input.output
       });
+      const lyricArtifacts = buildLyricArtifacts({
+        alignment: analysis.analysis.lyricAlignment,
+        lyrics: job.input.creative?.lyrics,
+        durationSeconds: analysis.source.durationSeconds,
+        title: job.input.source?.title
+      });
       job.result = {
         source: analysis.source,
         lyricAlignment: analysis.analysis.lyricAlignment,
         scenes,
+        artifacts: lyricArtifacts,
         warnings: analysis.warnings
       };
       job.status = 'completed';

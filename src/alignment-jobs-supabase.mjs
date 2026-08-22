@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { analyzeAudioBufferAsync } from './audio.mjs';
 import { generateScenePrompts } from './prompts.mjs';
+import { buildLyricArtifacts } from './lrc.mjs';
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
@@ -186,9 +187,10 @@ export class SupabaseAlignmentJobManager {
       const bytes = await this.downloadAudio(job.audioPath);
       const analysis = await analyzeAudioBufferAsync({ buffer: bytes, mimeType: job.mimeType, filename: job.filename, lyrics: job.input.creative?.lyrics, lyricsMode: job.input.creative?.lyricsMode, acousticAligner: this.acousticAligner });
       const scenes = generateScenePrompts({ sections: analysis.analysis.sections, creative: job.input.creative, analysis: analysis.analysis, output: job.input.output });
+      const lyricArtifacts = buildLyricArtifacts({ alignment: analysis.analysis.lyricAlignment, lyrics: job.input.creative?.lyrics, durationSeconds: analysis.source.durationSeconds, title: job.input.source?.title });
       await this.update(job.id, {
         status: 'completed',
-        result: { source: analysis.source, lyricAlignment: analysis.analysis.lyricAlignment, scenes, warnings: analysis.warnings },
+        result: { source: analysis.source, lyricAlignment: analysis.analysis.lyricAlignment, scenes, artifacts: lyricArtifacts, warnings: analysis.warnings },
         error: null,
         locked_at: null
       });

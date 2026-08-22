@@ -233,6 +233,11 @@ When lyrics are supplied, `analysis.lyricAlignment` includes provisional line- a
 - Every scene must have non-overlapping `startSeconds` and `endSeconds` within the requested duration.
 - Every scene must contain a prompt, negative prompt, edit guidance, and continuity references.
 - `artifacts.markdown` and `artifacts.timingCsv` are canonical convenience exports of the structured response.
+- `artifacts.lrc` is a standard line-timed lyric track suitable for lyric-video and karaoke tools.
+- `artifacts.enhancedLrc` is an enhanced LRC track with word-level timestamps where acoustic alignment supplies them;
+  lines without reliable word timing remain line-timed.
+- `artifacts.lrcMetadata` reports the number of line-timed, word-timed, and approximate lines. LRC timestamps are source
+  claims or alignment estimates, not a guarantee of vocal onset precision.
 - A low-confidence analysis must produce a warning rather than silently presenting guessed timing as certain.
 
 ## Preview response schema: `versevision/blueprint-preview/v1`

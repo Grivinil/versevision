@@ -207,6 +207,7 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
         requestSchema: 'versevision/blueprint-request/v1', responseSchema: 'versevision/blueprint/v1',
         alignment: { backend: acousticAligner ? 'acoustic_forced' : 'meter_estimate', optional: true, jobStore: alignmentJobs.kind },
         limits: { maxAudioBytes: 25 * 1024 * 1024, maxAudioSeconds: 300, maxReferenceUrls: 8 },
+        artifacts: { lyricFormats: ['lrc', 'enhanced_lrc'], enhancedWordTiming: Boolean(acousticAligner) },
         routes: {
           preview: { method: 'POST', path: '/v1/blueprint/preview', payment: 'none' },
           alignmentJob: { method: 'POST', path: '/v1/alignment/jobs', payment: 'not_enabled', enabled: Boolean(alignmentJobsEnabled && acousticAligner) },

@@ -1,4 +1,5 @@
 import { buildStyleBible, generateScenePrompts } from './prompts.mjs';
+import { buildLyricArtifacts } from './lrc.mjs';
 
 function markdownForBlueprint({ scenes, styleBible }) {
   const lines = ['# VerseVision Blueprint', '', `Visual thesis: ${styleBible.visualThesis}`, '', '## Scenes', ''];
@@ -22,6 +23,12 @@ function timingCsvForScenes(scenes) {
 export function buildBlueprintResponse({ id, input, analysis, createdAt = new Date().toISOString() }) {
   const styleBible = buildStyleBible({ creative: input.creative });
   const scenes = generateScenePrompts({ sections: analysis.analysis.sections, creative: input.creative, analysis: analysis.analysis, output: input.output });
+  const lyricArtifacts = buildLyricArtifacts({
+    alignment: analysis.analysis.lyricAlignment,
+    lyrics: input.creative?.lyrics,
+    durationSeconds: analysis.source.durationSeconds,
+    title: input.source.title
+  });
   return {
     schema: 'versevision/blueprint/v1',
     requestId: id,
@@ -31,7 +38,7 @@ export function buildBlueprintResponse({ id, input, analysis, createdAt = new Da
     analysis: analysis.analysis,
     styleBible,
     scenes,
-    artifacts: { markdown: markdownForBlueprint({ scenes, styleBible }), timingCsv: timingCsvForScenes(scenes) },
+    artifacts: { markdown: markdownForBlueprint({ scenes, styleBible }), timingCsv: timingCsvForScenes(scenes), ...lyricArtifacts },
     warnings: analysis.warnings,
     limits: { sceneCount: scenes.length, maxSceneCount: 40 }
   };
