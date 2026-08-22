@@ -67,19 +67,57 @@ function inferNarrativeMotifs(lines) {
   return motifs;
 }
 
+function narrativeProfile({ motifs, creative }) {
+  if (creative.brief) {
+    return {
+      subject: 'the central subject established by the creative brief',
+      setting: 'the primary world established by the creative brief',
+      anchor: 'the recurring prop or visual motif established by the brief'
+    };
+  }
+  const names = new Set(motifs.map((motif) => motif.name));
+  if (names.has('family or academic pressure') && names.has('a distinctive drink or handheld prop')) {
+    return {
+      subject: 'a cash-strapped, restless student whose boba ritual becomes a playful escape from family and academic pressure',
+      setting: 'a connected school, home, and neighborhood world with a recognizable kitchen-table or hallway anchor',
+      anchor: 'the same boba cup, report-card imagery, and expressive student wardrobe'
+    };
+  }
+  if (names.has('money and status anxiety')) {
+    return {
+      subject: 'a resourceful protagonist trying to appear more confident than their circumstances allow',
+      setting: 'a connected neighborhood world where storefronts, clothing, and empty pockets reveal status',
+      anchor: 'one conspicuous object that changes meaning as the protagonist’s fortunes shift'
+    };
+  }
+  if (names.has('a surreal escape or wish image')) {
+    return {
+      subject: 'a grounded protagonist tempted by an increasingly surreal escape',
+      setting: 'a familiar everyday world with one consistent threshold into the impossible',
+      anchor: 'a recurring ordinary object that foreshadows the wish image'
+    };
+  }
+  return {
+    subject: 'one recurring protagonist with a stable face, silhouette, wardrobe logic, and physicality',
+    setting: 'a consistent lived-in world whose geography remains legible from block to block',
+    anchor: 'a recurring prop or visual motif implied by the lyric intent'
+  };
+}
+
 function buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative, previous }) {
   const direction = narrativeDirectionFor(section.label, index);
   const lyricLines = lyricReferences.map((line) => line.text).filter(Boolean);
   const motifs = inferNarrativeMotifs(lyricLines);
-  const subject = creative.brief ? 'the central subject established by the creative brief' : 'one recurring protagonist with a stable face, silhouette, wardrobe logic, and physicality';
+  const profile = narrativeProfile({ motifs, creative });
+  const subject = profile.subject;
   const motifText = motifs.length ? motifs.map((motif) => motif.name).join(', ') : 'a recurring prop or visual motif implied by the lyric intent';
   const lyricHook = lyricLines.length ? lyricLines.slice(0, 3).join(' / ') : 'the section’s emotional turn';
   const continuity = previous
     ? `Continue directly from ${previous.id}: ${previous.stateAfter}. Keep the same protagonist, wardrobe logic, geography, and established motifs before introducing only the section’s new pressure.`
     : 'Open with an establishing image that makes the protagonist, world, and central want legible before expanding the visual scale.';
   const scene = index === 0
-    ? `Place the protagonist in a grounded primary location containing ${motifText}; make the environment express the tension in “${lyricHook}”.`
-    : `Move the protagonist through a connected location or a visibly changed version of the prior location; let ${motifText} cause or reveal the next turn rather than appearing as decoration.`;
+    ? `Place the protagonist in ${profile.setting}; establish ${profile.anchor} and make the environment express the tension in “${lyricHook}”.`
+    : `Move the protagonist through a connected version of ${profile.setting}; let ${motifText} cause or reveal the next turn rather than appearing as decoration, while ${profile.anchor} remains recognizable.`;
   const carryForward = previous
     ? `Carry forward the prior scene’s anchor prop, wardrobe, color logic, and spatial direction; transform one of them only when the story state changes.`
     : 'Establish a repeatable wardrobe, silhouette, location anchor, and prop that later scenes can recognize immediately.';
@@ -92,7 +130,9 @@ function buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative
     stateAfter: direction.state,
     continuityFrom: previous?.id || null,
     carryForward,
-    motifs
+    motifs,
+    setting: profile.setting,
+    anchor: profile.anchor
   };
 }
 
