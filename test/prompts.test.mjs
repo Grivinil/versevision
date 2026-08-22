@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStyleBible, generateScenePrompts } from '../src/prompts.mjs';
+import { auditSceneContinuity, buildStyleBible, generateScenePrompts } from '../src/prompts.mjs';
 
 test('generates time-coded scene prompts from classified sections', () => {
   const sections = [
@@ -30,6 +30,7 @@ test('generates time-coded scene prompts from classified sections', () => {
   assert.equal(scenes[1].lyricMoments.length, 1);
   assert.equal(scenes[1].lyricMoments[0].words[0].text, 'hook');
   assert.equal(scenes[1].lyricMoments[0].promptEligible, true);
+  assert.equal(scenes[1].lyricMoments[0].provenance, 'default_proposal');
   assert.ok(scenes[1].prompt.includes('The hook arrives'));
   assert.equal(scenes[1].edit.lyricCueCount, 1);
   assert.deepEqual(scenes[0].continuityRefs, ['character_01', 'location_01', 'style_01']);
@@ -53,6 +54,7 @@ test('confidence-gates acoustic lyric cues before putting them in prompts', () =
     }
   });
   assert.deepEqual(scenes[0].lyricMoments.map((moment) => moment.text), ['trusted line']);
+  assert.equal(scenes[0].lyricMoments[0].provenance, 'acoustically_aligned');
   assert.ok(scenes[0].prompt.includes('trusted line'));
   assert.ok(!scenes[0].prompt.includes('uncertain line'));
 });
@@ -119,6 +121,58 @@ test('derives concrete recurring details for narrative-specific lyrics', () => {
   assert.match(goodDay[0].narrative.subject, /red headphones/);
   assert.match(goodDay[1].narrative.setting, /rooftop overlook/);
   assert.match(goodDay[1].prompt, /yellow windbreaker/);
+});
+
+test('audits scene continuity and reports profile drift', () => {
+  const scenes = generateScenePrompts({
+    sections: [
+      { id: 'one', label: 'intro', startSeconds: 0, endSeconds: 8 },
+      { id: 'two', label: 'verse', startSeconds: 8, endSeconds: 16 }
+    ],
+    creative: { lyrics: 'A character wants a change.' }
+  });
+  const passing = auditSceneContinuity(scenes);
+  assert.equal(passing.status, 'pass');
+  assert.equal(passing.sceneCount, 2);
+  assert.equal(passing.violations.length, 0);
+
+  const drifted = structuredClone(scenes);
+  drifted[1].narrative.wardrobe = 'a different wardrobe';
+  const failing = auditSceneContinuity(drifted);
+  assert.equal(failing.status, 'fail');
+  assert.ok(failing.violations.some((item) => item.code === 'continuity_drift'));
+});
+
+test('applies user visual overrides across every scene', () => {
+  const scenes = generateScenePrompts({
+    sections: [
+      { id: 'one', label: 'intro', startSeconds: 0, endSeconds: 8 },
+      { id: 'two', label: 'chorus', startSeconds: 8, endSeconds: 16 }
+    ],
+    creative: {
+      lyrics: 'A character walks toward the sea.',
+      visualOverrides: {
+        subject: 'A woman in a silver raincoat',
+        setting: 'A single coastal motel and its parking lot',
+        wardrobe: 'Silver raincoat, red boots, black gloves',
+        palette: 'Steel blue and sodium orange',
+        spatialRule: 'Always move toward the ocean until the bridge',
+        camera: 'Locked-off wides with occasional slow dolly-ins',
+        requiredProps: ['red umbrella'],
+        avoid: ['crowds']
+      }
+    }
+  });
+  assert.equal(scenes[0].narrative.subject, 'A woman in a silver raincoat');
+  assert.equal(scenes[1].narrative.setting, 'A single coastal motel and its parking lot');
+  assert.equal(scenes[1].camera.shot, 'Locked-off wides with occasional slow dolly-ins');
+  assert.deepEqual(scenes[1].narrative.requiredProps, ['red umbrella']);
+  assert.equal(scenes[1].provenance.subject, 'user_supplied');
+  assert.equal(scenes[1].provenance.requiredProps, 'user_supplied');
+  assert.equal(scenes[1].provenance.lyricHooks, 'user_supplied');
+  assert.match(scenes[1].prompt, /Avoid: crowds/);
+  assert.match(scenes[1].negativePrompt, /crowds/);
+  assert.equal(buildStyleBible({ creative: { visualOverrides: { palette: 'Steel blue' } } }).userOverrides.palette, 'Steel blue');
 });
 
 test('builds a reusable style bible from creative intent', () => {

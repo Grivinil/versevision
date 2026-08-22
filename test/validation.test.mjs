@@ -74,3 +74,29 @@ test('accepts transcription benchmark mode without supplied lyrics', () => {
   const result = validateBlueprintRequest({ ...validRequest, alignment: { mode: 'transcription' } });
   assert.equal(result.ok, true);
 });
+
+test('accepts bounded visual overrides and rejects oversized override lists', () => {
+  const valid = validateBlueprintRequest({
+    ...validRequest,
+    creative: {
+      ...validRequest.creative,
+      visualOverrides: {
+        subject: 'A woman in a silver raincoat',
+        setting: 'A single coastal motel and its parking lot',
+        wardrobe: 'Silver raincoat, red boots, black gloves',
+        palette: 'Steel blue and sodium orange',
+        spatialRule: 'Always move toward the ocean until the bridge',
+        camera: 'Locked-off wides with occasional slow dolly-ins',
+        requiredProps: ['red umbrella', 'paper map'],
+        avoid: ['crowds', 'text overlays']
+      }
+    }
+  });
+  assert.equal(valid.ok, true);
+  const invalid = validateBlueprintRequest({
+    ...validRequest,
+    creative: { ...validRequest.creative, visualOverrides: { requiredProps: Array.from({ length: 9 }, () => 'prop') } }
+  });
+  assert.equal(invalid.ok, false);
+  assert.ok(invalid.errors.some((error) => error.path === 'creative.visualOverrides.requiredProps'));
+});

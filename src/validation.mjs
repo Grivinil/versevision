@@ -41,6 +41,33 @@ function validateStringArray(errors, value, path) {
   value.forEach((item, index) => validateString(errors, item, `${path}[${index}]`, { maxLength: 80, required: true }));
 }
 
+function validateOverrideArray(errors, value, path) {
+  if (value === undefined) return;
+  if (!Array.isArray(value) || value.length > 8) {
+    add(errors, path, 'must be an array of at most 8 strings');
+    return;
+  }
+  value.forEach((item, index) => validateString(errors, item, `${path}[${index}]`, { maxLength: 160, required: true }));
+}
+
+function validateVisualOverrides(errors, overrides) {
+  if (overrides === undefined) return;
+  const path = 'creative.visualOverrides';
+  if (!isObject(overrides)) {
+    add(errors, path, 'must be an object');
+    return;
+  }
+  rejectUnknown(errors, overrides, new Set(['subject', 'setting', 'wardrobe', 'palette', 'spatialRule', 'camera', 'requiredProps', 'avoid']), path);
+  validateString(errors, overrides.subject, `${path}.subject`, { maxLength: 600 });
+  validateString(errors, overrides.setting, `${path}.setting`, { maxLength: 1200 });
+  validateString(errors, overrides.wardrobe, `${path}.wardrobe`, { maxLength: 600 });
+  validateString(errors, overrides.palette, `${path}.palette`, { maxLength: 600 });
+  validateString(errors, overrides.spatialRule, `${path}.spatialRule`, { maxLength: 1200 });
+  validateString(errors, overrides.camera, `${path}.camera`, { maxLength: 600 });
+  validateOverrideArray(errors, overrides.requiredProps, `${path}.requiredProps`);
+  validateOverrideArray(errors, overrides.avoid, `${path}.avoid`);
+}
+
 function validateSource(errors, source) {
   const path = 'source';
   if (!isObject(source)) {
@@ -74,7 +101,7 @@ function validateCreative(errors, creative) {
     add(errors, path, 'must be an object');
     return;
   }
-  rejectUnknown(errors, creative, new Set(['brief', 'lyrics', 'lyricsMode', 'genre', 'mood', 'visualStyle', 'referenceUrls']), path);
+  rejectUnknown(errors, creative, new Set(['brief', 'lyrics', 'lyricsMode', 'genre', 'mood', 'visualStyle', 'referenceUrls', 'visualOverrides']), path);
   validateString(errors, creative.brief, `${path}.brief`, { maxLength: 4000 });
   validateString(errors, creative.lyrics, `${path}.lyrics`, { maxLength: 20000 });
   if (creative.lyricsMode !== undefined && !['provided', 'auto_tag'].includes(creative.lyricsMode)) add(errors, `${path}.lyricsMode`, 'must be provided or auto_tag');
@@ -82,6 +109,7 @@ function validateCreative(errors, creative) {
   validateStringArray(errors, creative.genre, `${path}.genre`);
   validateStringArray(errors, creative.mood, `${path}.mood`);
   validateString(errors, creative.visualStyle, `${path}.visualStyle`, { maxLength: 2000 });
+  validateVisualOverrides(errors, creative.visualOverrides);
   if (creative.referenceUrls !== undefined) {
     if (!Array.isArray(creative.referenceUrls) || creative.referenceUrls.length > 8) {
       add(errors, `${path}.referenceUrls`, 'must be an array of at most 8 HTTPS URLs');

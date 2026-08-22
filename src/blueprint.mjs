@@ -1,4 +1,4 @@
-import { buildStyleBible, generateScenePrompts } from './prompts.mjs';
+import { auditSceneContinuity, buildStyleBible, generateScenePrompts } from './prompts.mjs';
 import { buildLyricArtifacts } from './lrc.mjs';
 
 function markdownForBlueprint({ scenes, styleBible }) {
@@ -38,6 +38,7 @@ export function buildBlueprintResponse({ id, input, analysis, createdAt = new Da
     analysis: analysis.analysis,
     styleBible,
     scenes,
+    continuityAudit: auditSceneContinuity(scenes),
     artifacts: { markdown: markdownForBlueprint({ scenes, styleBible }), timingCsv: timingCsvForScenes(scenes), ...lyricArtifacts },
     warnings: analysis.warnings,
     limits: { sceneCount: scenes.length, maxSceneCount: 40 }

@@ -41,6 +41,16 @@ Both routes accept the same logical request. JSON requests use `source.kind = "u
     "genre": ["electronic", "cinematic"],
     "mood": ["restless", "hopeful"],
     "visualStyle": "Anamorphic night photography, rain reflections, saturated cyan and amber.",
+    "visualOverrides": {
+      "subject": "A woman in a silver raincoat",
+      "setting": "A single coastal motel and its parking lot",
+      "wardrobe": "Silver raincoat, red boots, black gloves",
+      "palette": "Steel blue and sodium orange",
+      "spatialRule": "Always move toward the ocean until the bridge",
+      "camera": "Locked-off wides with occasional slow dolly-ins",
+      "requiredProps": ["red umbrella", "paper map"],
+      "avoid": ["crowds", "text overlays"]
+    },
     "referenceUrls": [
       "https://example.com/reference-image.jpg"
     ]
@@ -74,6 +84,9 @@ Both routes accept the same logical request. JSON requests use `source.kind = "u
 - `alignment.mode` is optional and defaults to `provisional`. `acoustic` is accepted only when lyrics are supplied and is intended for the asynchronous alignment-job route.
 - `genre` and `mood` accept up to five strings each, with 80 characters per string.
 - `visualStyle` is optional and limited to 2,000 characters.
+- `visualOverrides` is optional. It lets the caller lock the subject, setting, wardrobe, palette, screen-direction rule,
+  camera language, required props, and forbidden elements across every scene. Text fields are bounded; `requiredProps`
+  and `avoid` accept up to eight items each.
 - `referenceUrls` accepts up to eight HTTPS image URLs.
 - `durationSeconds`, when supplied, must be an integer from 1 to 300 and cannot exceed the analyzed track duration.
 - `aspectRatio` must be one of `16:9`, `9:16`, `1:1`, or `4:5`.
@@ -196,7 +209,17 @@ server and returns a WhisperX transcript without supplied lyrics; it is not adve
         "type": "character",
         "description": "Lead performer in a silver jacket and red scarf."
       }
-    ]
+    ],
+    "userOverrides": {
+      "palette": "Steel blue and sodium orange"
+    }
+  },
+  "continuityAudit": {
+    "status": "pass",
+    "score": 100,
+    "sceneCount": 24,
+    "checks": [],
+    "violations": []
   },
   "scenes": [
     {
@@ -214,6 +237,22 @@ server and returns a WhisperX transcript without supplied lyrics; it is not adve
         "movement": "slow push-in"
       },
       "lighting": "Cyan storefront light with amber reflections in the pavement.",
+      "narrative": {
+        "subject": "A woman in a silver raincoat",
+        "setting": "A single coastal motel and its parking lot",
+        "anchor": "the red umbrella and paper map",
+        "wardrobe": "Silver raincoat, red boots, black gloves",
+        "spatialRule": "Always move toward the ocean until the bridge",
+        "palette": "Steel blue and sodium orange"
+      },
+      "provenance": {
+        "subject": "user_supplied",
+        "setting": "user_supplied",
+        "wardrobe": "user_supplied",
+        "palette": "user_supplied",
+        "lyricMoments": [],
+        "lyricReferences": []
+      },
       "edit": {
         "cutOnBeat": true,
         "transition": "hard-cut"
@@ -247,6 +286,11 @@ server and returns a WhisperX transcript without supplied lyrics; it is not adve
 - `artifacts.lrcMetadata` reports the number of line-timed, word-timed, and approximate lines. LRC timestamps are source
   claims or alignment estimates, not a guarantee of vocal onset precision.
 - A low-confidence analysis must produce a warning rather than silently presenting guessed timing as certain.
+- `continuityAudit` reports profile drift, broken scene-to-scene state handoffs, missing narrative fields, and timing
+  overlaps. A passing audit means the generated profile stayed stable; it does not guarantee that an external generator
+  will render identity perfectly.
+- Provenance labels are `user_supplied`, `lyric_inferred`, `default_proposal`, or `acoustically_aligned`. They describe
+  where a detail came from; they are not confidence scores.
 
 ## Preview response schema: `versevision/blueprint-preview/v1`
 

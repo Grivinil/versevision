@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { analyzeAudioBufferAsync } from './audio.mjs';
-import { generateScenePrompts } from './prompts.mjs';
+import { auditSceneContinuity, generateScenePrompts } from './prompts.mjs';
 import { buildLyricArtifacts } from './lrc.mjs';
 import { SupabaseAlignmentJobManager } from './alignment-jobs-supabase.mjs';
 
@@ -143,6 +143,7 @@ export class AlignmentJobManager {
         source: analysis.source,
         lyricAlignment: analysis.analysis.lyricAlignment,
         scenes,
+        continuityAudit: auditSceneContinuity(scenes),
         artifacts: lyricArtifacts,
         warnings: analysis.warnings
       };

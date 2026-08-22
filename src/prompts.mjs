@@ -24,13 +24,15 @@ function beatCues(section, beatGrid) {
 function lyricMomentsFor(section, alignment) {
   const aligned = alignment?.sections?.find((item) => item.audioSectionId === section.id);
   if (!aligned?.lines?.length) return [];
-  const confidenceFloor = alignment.backend === 'acoustic_forced' || alignment.mode === 'acoustic_forced' ? 0.65 : 0.3;
+  const acoustic = alignment.backend === 'acoustic_forced' || alignment.mode === 'acoustic_forced';
+  const confidenceFloor = acoustic ? 0.65 : 0.3;
   return aligned.lines.filter((line) => Number(line.confidence) >= confidenceFloor).slice(0, 3).map((line) => ({
     text: line.text,
     startSeconds: line.startSeconds,
     endSeconds: line.endSeconds,
     confidence: line.confidence,
-    source: line.source,
+    source: line.source || (acoustic ? 'acoustic_forced_alignment' : 'meter_estimate'),
+    provenance: acoustic ? 'acoustically_aligned' : lyricProvenance(line),
     words: line.words?.slice(0, 24) || [],
     promptEligible: true
   }));
@@ -74,7 +76,7 @@ function inferNarrativeMotifs(lines) {
   return motifs;
 }
 
-function narrativeProfile({ motifs, creative }) {
+function baseNarrativeProfile({ motifs, creative }) {
   if (creative.brief) {
     return {
       subject: 'the central subject established by the creative brief',
@@ -146,11 +148,60 @@ function narrativeProfile({ motifs, creative }) {
   };
 }
 
+function narrativeProfile({ motifs, creative }) {
+  const base = baseNarrativeProfile({ motifs, creative });
+  const overrides = creative?.visualOverrides;
+  if (!overrides || typeof overrides !== 'object') return { ...base, requiredProps: [], avoid: [], camera: null };
+  const requiredProps = Array.isArray(overrides.requiredProps) ? overrides.requiredProps.filter(Boolean) : [];
+  const avoid = Array.isArray(overrides.avoid) ? overrides.avoid.filter(Boolean) : [];
+  return {
+    ...base,
+    ...(overrides.subject ? { subject: overrides.subject } : {}),
+    ...(overrides.setting ? { setting: overrides.setting } : {}),
+    ...(overrides.wardrobe ? { wardrobe: overrides.wardrobe } : {}),
+    ...(overrides.palette ? { palette: overrides.palette } : {}),
+    ...(overrides.spatialRule ? { spatialRule: overrides.spatialRule } : {}),
+    requiredProps,
+    avoid,
+    camera: overrides.camera || null
+  };
+}
+
+function profileProvenance({ creative = {}, globalMotifs = [] } = {}) {
+  const overrides = creative.visualOverrides && typeof creative.visualOverrides === 'object' ? creative.visualOverrides : {};
+  const source = (field) => {
+    if (Object.prototype.hasOwnProperty.call(overrides, field)) return 'user_supplied';
+    if (field === 'palette' && creative.visualStyle) return 'user_supplied';
+    if (creative.brief && ['subject', 'setting'].includes(field)) return 'user_supplied';
+    if (globalMotifs.length && ['subject', 'setting', 'anchor'].includes(field)) return 'lyric_inferred';
+    return 'default_proposal';
+  };
+  return {
+    subject: source('subject'),
+    setting: source('setting'),
+    anchor: source('anchor'),
+    wardrobe: source('wardrobe'),
+    spatialRule: source('spatialRule'),
+    palette: source('palette'),
+    requiredProps: overrides.requiredProps ? 'user_supplied' : 'default_proposal',
+    avoid: overrides.avoid ? 'user_supplied' : 'default_proposal',
+    camera: overrides.camera ? 'user_supplied' : 'default_proposal',
+    motifs: globalMotifs.length ? 'lyric_inferred' : 'default_proposal'
+  };
+}
+
+function lyricProvenance(line) {
+  if (line?.timing === 'acoustic' || line?.source === 'acoustic_forced_alignment') return 'acoustically_aligned';
+  if (line?.source === 'provided_lyrics_reference') return 'user_supplied';
+  return 'default_proposal';
+}
+
 function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, creative, previous, globalMotifs }) {
   const direction = narrativeDirectionFor(section.label, index, total);
   const lyricLines = lyricReferences.map((line) => line.text).filter(Boolean);
   const motifs = inferNarrativeMotifs(lyricLines);
   const profile = narrativeProfile({ motifs: globalMotifs?.length ? globalMotifs : motifs, creative });
+  const provenance = profileProvenance({ creative, globalMotifs: globalMotifs?.length ? globalMotifs : motifs });
   const subject = profile.subject;
   const motifText = motifs.length ? motifs.map((motif) => motif.name).join(', ') : 'a recurring prop or visual motif implied by the lyric intent';
   const lyricHook = lyricLines.length ? lyricLines.slice(0, 3).join(' / ') : 'the section’s emotional turn';
@@ -166,17 +217,19 @@ function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, c
     ? `Carry forward the prior scene’s anchor prop, wardrobe, color logic, and spatial direction; transform one of them only when the story state changes.`
     : 'Establish a repeatable wardrobe, silhouette, location anchor, and prop that later scenes can recognize immediately.';
   const payoff = direction.role === 'visual payoff';
+  const requiredPropsText = profile.requiredProps.length ? ` Required props: ${profile.requiredProps.join(', ')}.` : '';
+  const avoidText = profile.avoid.length ? ` Avoid: ${profile.avoid.join(', ')}.` : '';
   const preciseContinuity = previous
     ? `Continue directly from ${previous.id}: ${previous.stateAfter}. Keep ${profile.subject} in ${profile.wardrobe}; preserve ${profile.anchor}, ${profile.setting}, and the rule that ${profile.spatialRule} before introducing only the section's new pressure.`
     : `Open with an establishing image of ${profile.subject} inside ${profile.setting}; make ${profile.anchor} visible and establish that ${profile.spatialRule}.`;
   const preciseScene = index === 0
-    ? `Place ${profile.subject} in ${profile.setting}; show ${profile.anchor} in the first readable composition and use ${profile.palette} as the baseline palette while the lyric hook "${lyricHook}" triggers the opening action.`
+    ? `Place ${profile.subject} in ${profile.setting}; show ${profile.anchor} in the first readable composition and use ${profile.palette} as the baseline palette while the lyric hook "${lyricHook}" triggers the opening action.${requiredPropsText}${avoidText}`
     : payoff
-      ? `Return ${profile.subject} to the established ${profile.setting}; make ${profile.anchor} deliver the payoff, with ${profile.spatialRule} and ${profile.palette} visibly intensified rather than replaced.`
-      : `Move ${profile.subject} through ${profile.setting}; use ${profile.anchor} and ${profile.spatialRule} to cause or reveal the next turn, while ${motifText} changes the character's behavior rather than sitting in the background.`;
+      ? `Return ${profile.subject} to the established ${profile.setting}; make ${profile.anchor} deliver the payoff, with ${profile.spatialRule} and ${profile.palette} visibly intensified rather than replaced.${requiredPropsText}${avoidText}`
+      : `Move ${profile.subject} through ${profile.setting}; use ${profile.anchor} and ${profile.spatialRule} to cause or reveal the next turn, while ${motifText} changes the character's behavior rather than sitting in the background.${requiredPropsText}${avoidText}`;
   const preciseCarryForward = previous
-    ? `${preciseContinuity} Carry forward ${profile.wardrobe}, ${profile.anchor}, and ${profile.palette}; preserve ${profile.spatialRule}. Change only the single prop, lighting state, or blocking choice required by the new story state.`
-    : `${preciseContinuity} Establish ${profile.wardrobe}, ${profile.anchor}, ${profile.palette}, and ${profile.spatialRule} so later scenes can match the same subject and geography immediately.`;
+    ? `${preciseContinuity} Carry forward ${profile.wardrobe}, ${profile.anchor}, and ${profile.palette}; preserve ${profile.spatialRule}. Change only the single prop, lighting state, or blocking choice required by the new story state.${requiredPropsText}${avoidText}`
+    : `${preciseContinuity} Establish ${profile.wardrobe}, ${profile.anchor}, ${profile.palette}, and ${profile.spatialRule} so later scenes can match the same subject and geography immediately.${requiredPropsText}${avoidText}`;
   return {
     arcRole: direction.role,
     subject,
@@ -191,7 +244,14 @@ function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, c
     anchor: profile.anchor,
     wardrobe: profile.wardrobe,
     spatialRule: profile.spatialRule,
-    palette: profile.palette
+    palette: profile.palette,
+    requiredProps: profile.requiredProps,
+    avoid: profile.avoid,
+    camera: profile.camera,
+    provenance: {
+      ...provenance,
+      lyricHooks: lyricLines.length ? 'user_supplied' : 'default_proposal'
+    }
   };
 }
 
@@ -219,13 +279,14 @@ function lyricReferencesFor({ section, sectionIndex, sections, lyrics, alignment
     confidence: line.confidence,
     source: line.source || 'acoustic_forced_alignment',
     timing: 'acoustic',
+    provenance: 'acoustically_aligned',
     promptEligible: Number(line.confidence) >= 0.65
   }));
   const acousticText = new Set(acoustic.map((line) => String(line.text).trim().toLowerCase()));
   const references = [...acoustic];
   for (const text of windowLines) {
     if (acousticText.has(text.toLowerCase())) continue;
-    references.push({ text, confidence: null, source: 'provided_lyrics_reference', timing: 'approximate', promptEligible: false });
+    references.push({ text, confidence: null, source: 'provided_lyrics_reference', timing: 'approximate', provenance: 'user_supplied', promptEligible: false });
   }
   return references.slice(0, 8);
 }
@@ -246,7 +307,7 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
     const lyricReferences = lyricReferencesFor({ section, sectionIndex: index, sections, lyrics: creative.lyrics, alignment: analysis.lyricAlignment });
     const narrative = buildNarrativeBeat({ sceneId, section, index, total: sections.length, lyricReferences, creative, previous: previousBeat, globalMotifs });
     const narrativePrompt = `Narrative continuity: ${narrative.continuityFrom ? `continue from ${narrative.continuityFrom};` : 'begin the story;'} Arc role: ${narrative.arcRole}. Subject: ${narrative.subject}. Scene: ${narrative.scene} Character action: ${narrative.characterAction} State transition: ${narrative.stateBefore} → ${narrative.stateAfter}. ${narrative.carryForward}`;
-    const narrativeSpecifics = `Wardrobe continuity: ${narrative.wardrobe}. Spatial continuity: ${narrative.spatialRule}. Palette continuity: ${narrative.palette}.`;
+    const narrativeSpecifics = `Wardrobe continuity: ${narrative.wardrobe}. Spatial continuity: ${narrative.spatialRule}. Palette continuity: ${narrative.palette}. ${narrative.requiredProps.length ? `Required props: ${narrative.requiredProps.join(', ')}.` : ''} ${narrative.avoid.length ? `Avoid: ${narrative.avoid.join(', ')}.` : ''}`;
     const lyricCueText = lyricMoments.length
       ? `Lyric moments to honor: ${lyricMoments.map((moment) => `"${moment.text}" (${moment.startSeconds.toFixed(3)}-${moment.endSeconds.toFixed(3)}s)`).join(' | ')}.`
       : '';
@@ -264,10 +325,15 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
       lyricReferences,
       lyricDirection,
       narrative,
+      provenance: {
+        ...narrative.provenance,
+        lyricMoments: lyricMoments.map((moment) => moment.provenance),
+        lyricReferences: lyricReferences.map((reference) => reference.provenance)
+      },
       intent: direction.intent,
       prompt: `${direction.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${narrativePrompt} ${narrativeSpecifics} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
-      negativePrompt: DEFAULT_NEGATIVE_PROMPT,
-      camera: { shot: direction.camera, movement: direction.camera },
+      negativePrompt: [DEFAULT_NEGATIVE_PROMPT, ...narrative.avoid].join(', '),
+      camera: { shot: narrative.camera || direction.camera, movement: narrative.camera || direction.camera },
       lighting: direction.lighting,
       edit: { cutOnBeat: section.label === 'chorus' || section.label === 'pre-chorus', transition: direction.transition, lyricCueCount: lyricMoments.length, lyricReferenceCount: lyricReferences.length, lyricCuePolicy: 'confidence_gated_with_approximate_text_references' },
       continuityRefs,
@@ -278,10 +344,60 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
   });
 }
 
+export function auditSceneContinuity(scenes = []) {
+  if (!Array.isArray(scenes) || scenes.length === 0) {
+    return { status: 'not_available', score: null, sceneCount: 0, checks: [], violations: [] };
+  }
+  const checks = [];
+  const violations = [];
+  const required = ['subject', 'setting', 'anchor', 'wardrobe', 'spatialRule', 'palette', 'arcRole', 'stateBefore', 'stateAfter'];
+  const pass = (code, sceneId, message) => checks.push({ code, sceneId, status: 'pass', message });
+  const fail = (code, sceneId, message, severity = 'error') => {
+    const finding = { code, sceneId, severity, message };
+    checks.push({ ...finding, status: 'fail' });
+    violations.push(finding);
+  };
+
+  scenes.forEach((scene, index) => {
+    const sceneId = scene?.id || `scene_${String(index + 1).padStart(2, '0')}`;
+    const narrative = scene?.narrative || {};
+    for (const field of required) {
+      if (typeof narrative[field] !== 'string' || !narrative[field].trim()) fail('missing_narrative_field', sceneId, `narrative.${field} is missing or empty`);
+    }
+    if (index > 0) {
+      const previous = scenes[index - 1];
+      const previousId = previous?.id || `scene_${String(index).padStart(2, '0')}`;
+      const previousNarrative = previous?.narrative || {};
+      for (const field of ['subject', 'setting', 'anchor', 'wardrobe', 'spatialRule', 'palette']) {
+        if (narrative[field] !== previousNarrative[field]) fail('continuity_drift', sceneId, `${field} changed from ${previousId} without an explicit profile change`);
+        else pass(`stable_${field}`, sceneId, `${field} matches ${previousId}`);
+      }
+      if (narrative.continuityFrom !== previousId) fail('broken_continuity_link', sceneId, `continuityFrom must reference ${previousId}`);
+      else pass('continuity_link', sceneId, `continuityFrom references ${previousId}`);
+      if (narrative.stateBefore !== previousNarrative.stateAfter) fail('broken_state_handoff', sceneId, `stateBefore must equal ${previousId}.stateAfter`);
+      else pass('state_handoff', sceneId, `stateBefore matches ${previousId}.stateAfter`);
+      if (Number.isFinite(previous.endSeconds) && Number.isFinite(scene.startSeconds) && scene.startSeconds < previous.endSeconds) fail('overlapping_scene_window', sceneId, `scene starts before ${previousId} ends`);
+      else pass('ordered_scene_window', sceneId, 'scene timing follows the previous scene');
+    } else {
+      if (narrative.continuityFrom !== null) fail('invalid_first_continuity_link', sceneId, 'the first scene must have continuityFrom = null');
+      else pass('first_scene_anchor', sceneId, 'first scene starts a new continuity chain');
+    }
+  });
+  const errorCount = violations.filter((item) => item.severity === 'error').length;
+  return {
+    status: errorCount ? 'fail' : 'pass',
+    score: Number(((checks.filter((check) => check.status === 'pass').length / Math.max(1, checks.length)) * 100).toFixed(1)),
+    sceneCount: scenes.length,
+    checks,
+    violations
+  };
+}
+
 export function buildStyleBible({ creative = {} } = {}) {
   return {
     visualThesis: creative.brief || 'A coherent visual interpretation of the supplied music.',
     palette: creative.visualStyle ? [creative.visualStyle] : ['derive from the supplied mood and references'],
+    userOverrides: creative.visualOverrides || null,
     lighting: 'Maintain a consistent lighting logic while allowing section-level intensity changes.',
     cameraLanguage: 'Use section-specific movement while preserving subject identity and spatial continuity.',
     texture: 'Keep texture, lens character, and image-generation artifacts consistent across scenes.',
