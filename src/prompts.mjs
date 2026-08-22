@@ -110,7 +110,7 @@ function baseNarrativeProfile({ motifs, creative }) {
       palette: 'dusty ochre, faded red-and-cream stripes, greasy amber highlights, and deep brown shadows'
     };
   }
-  if (names.has('a bright day becoming a private music-video world')) {
+  if (names.has('a bright day becoming a private music-video world') && !names.has('a breath-led inward-to-cosmic meditation') && !names.has('a silver thread joining the body to a breathing cosmos')) {
     return {
       subject: 'a carefree young traveler in a yellow windbreaker, red headphones, white sneakers, and a small blue daypack',
       setting: 'a tree-lined residential block that opens into a pocket park, a pedestrian bridge, and a bright rooftop overlook',
