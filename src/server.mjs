@@ -6,8 +6,10 @@ import { fetchAudioUrl } from './ingest.mjs';
 import { parseMultipartBody } from './multipart.mjs';
 import { NARRATIVE_MODES, validateBlueprintRequest } from './validation.mjs';
 import { buildBlueprintResponse } from './blueprint.mjs';
+import { generateScenePrompts } from './prompts.mjs';
 import { createWhisperXAligner } from './acoustic-worker.mjs';
 import { createAlignmentJobManager } from './alignment-jobs.mjs';
+import { STUDIO_HTML } from './studio.mjs';
 
 const JSON_BODY_LIMIT = 128 * 1024;
 const MULTIPART_BODY_LIMIT = MAX_AUDIO_BYTES + 512 * 1024;
@@ -17,6 +19,14 @@ const DEFAULT_HOST = '0.0.0.0';
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(body));
+}
+
+function sendHtml(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store'
+  });
+  response.end(body);
 }
 
 function sendText(response, statusCode, body, filename) {
@@ -104,6 +114,25 @@ function estimateSceneCount(durationSeconds, granularity) {
 export function buildPreviewResponse({ id, input, analysis }) {
   const durationSeconds = input.output?.durationSeconds ?? analysis.source.durationSeconds;
   const granularity = input.output?.sceneGranularity || 'standard';
+  const sections = Array.isArray(analysis.analysis.sections) ? analysis.analysis.sections : [];
+  const scenes = generateScenePrompts({
+    sections,
+    creative: input.creative || {},
+    analysis: analysis.analysis,
+    output: input.output || {}
+  });
+  const sampleScenes = scenes.slice(0, 2).map((scene) => ({
+    id: scene.id,
+    startSeconds: scene.startSeconds,
+    endSeconds: scene.endSeconds,
+    sectionId: scene.sectionId,
+    sectionLabel: scene.sectionLabel,
+    intent: scene.intent,
+    prompt: scene.prompt,
+    camera: scene.camera,
+    lighting: scene.lighting,
+    narrative: scene.narrative
+  }));
   return {
     schema: 'versevision/blueprint-preview/v1',
     requestId: id,
@@ -115,15 +144,18 @@ export function buildPreviewResponse({ id, input, analysis }) {
     },
     analysisSummary: {
       bpm: analysis.analysis.bpm,
-      sectionCount: analysis.analysis.sections.length,
+      sectionCount: sections.length,
       estimatedSceneCount: estimateSceneCount(durationSeconds, granularity),
       estimatedDurationSeconds: durationSeconds,
       energySampleCount: analysis.analysis.energyCurve.length,
       confidence: analysis.analysis.confidence,
-      sections: analysis.analysis.sections,
+      sections,
       lyrics: analysis.analysis.lyrics,
       lyricAlignment: analysis.analysis.lyricAlignment
     },
+    sampleScenes,
+    sampleSceneCount: sampleScenes.length,
+    samplePreviewSeconds: sampleScenes.at(-1)?.endSeconds ?? 0,
     warnings: analysis.warnings,
     next: { route: '/v1/blueprint', requiresPayment: true }
   };
@@ -208,6 +240,7 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
   }
   const server = createHttpServer(async (request, response) => {
     const route = new URL(request.url || '/', 'http://localhost').pathname;
+    if (request.method === 'GET' && (route === '/' || route === '/studio')) return sendHtml(response, 200, STUDIO_HTML);
     if (request.method === 'GET' && route === '/health') {
       return sendJson(response, 200, { service: 'versevision', status: 'ok', stage: process.env.NODE_ENV || 'development' });
     }
@@ -227,6 +260,7 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
           }
         },
         routes: {
+          studio: { method: 'GET', path: '/studio', payment: 'none', audience: 'human' },
           preview: { method: 'POST', path: '/v1/blueprint/preview', payment: 'none' },
           alignmentJob: { method: 'POST', path: '/v1/alignment/jobs', payment: 'not_enabled', enabled: Boolean(alignmentJobsEnabled && acousticAligner) },
           alignmentStatus: { method: 'GET', path: '/v1/alignment/jobs/{jobId}', payment: 'none' },

@@ -23,8 +23,61 @@ test('builds the preview response from analysis without inventing scene data', (
   assert.equal(response.analysisSummary.bpm.value, 120);
   assert.equal(response.analysisSummary.sectionCount, 0);
   assert.equal(response.analysisSummary.estimatedSceneCount, 2);
+  assert.deepEqual(response.sampleScenes, []);
+  assert.equal(response.sampleSceneCount, 0);
   assert.equal(response.warnings.length, 1);
   assert.equal(response.next.requiresPayment, true);
+});
+
+test('preview response exposes two narrative sample scenes when sections exist', () => {
+  const response = buildPreviewResponse({
+    id: 'vv_samples',
+    input: {
+      source: { kind: 'url', title: 'Sample track' },
+      creative: { narrativeMode: 'meditation', lyrics: 'Breathe in\nBreathe out', visualStyle: 'soft cosmic light' },
+      output: { aspectRatio: '16:9' }
+    },
+    analysis: {
+      source: { mimeType: 'audio/wav', durationSeconds: 16 },
+      analysis: {
+        bpm: { value: 90, confidence: 0.8 },
+        beatGrid: { intervalSeconds: 2 },
+        sections: [
+          { id: 'intro_01', label: 'intro', startSeconds: 0, endSeconds: 8, confidence: 0.7 },
+          { id: 'verse_02', label: 'verse', startSeconds: 8, endSeconds: 16, confidence: 0.7 },
+          { id: 'outro_03', label: 'outro', startSeconds: 16, endSeconds: 20, confidence: 0.6 }
+        ],
+        energyCurve: [],
+        confidence: 0.8,
+        lyricAlignment: { sections: [] }
+      },
+      warnings: []
+    }
+  });
+  assert.equal(response.sampleSceneCount, 2);
+  assert.equal(response.sampleScenes[0].sectionLabel, 'intro');
+  assert.equal(response.sampleScenes[0].narrative.arcRole, 'grounding preparation');
+  assert.equal(response.sampleScenes[1].narrative.continuityFrom, response.sampleScenes[0].id);
+  assert.equal(response.samplePreviewSeconds, 16);
+});
+
+test('serves the human-facing studio page at /studio and /', async () => {
+  const server = createVerseVisionServer({ port: 0, host: '127.0.0.1' });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    for (const path of ['/studio', '/']) {
+      const response = await fetch(`http://127.0.0.1:${address.port}${path}`);
+      const body = await response.text();
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get('content-type'), /text\/html/);
+      assert.match(body, /VerseVision/);
+      assert.match(body, /v1\/blueprint\/preview/);
+      assert.match(body, /Generate free preview/);
+    }
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 function makeSilentWav() {
