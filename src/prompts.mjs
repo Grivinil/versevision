@@ -117,7 +117,9 @@ function buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative
     : 'Open with an establishing image that makes the protagonist, world, and central want legible before expanding the visual scale.';
   const scene = index === 0
     ? `Place the protagonist in ${profile.setting}; establish ${profile.anchor} and make the environment express the tension in “${lyricHook}”.`
-    : `Move the protagonist through a connected version of ${profile.setting}; let ${motifText} cause or reveal the next turn rather than appearing as decoration, while ${profile.anchor} remains recognizable.`;
+    : section.label === 'chorus'
+      ? `Return to ${profile.setting}; let ${motifText} deliver the visual payoff rather than appearing as decoration, while ${profile.anchor} remains recognizable.`
+      : `Move the protagonist through ${profile.setting}; let ${motifText} cause or reveal the next turn rather than appearing as decoration, while ${profile.anchor} remains recognizable.`;
   const carryForward = previous
     ? `Carry forward the prior scene’s anchor prop, wardrobe, color logic, and spatial direction; transform one of them only when the story state changes.`
     : 'Establish a repeatable wardrobe, silhouette, location anchor, and prop that later scenes can recognize immediately.';
