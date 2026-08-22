@@ -50,9 +50,14 @@ const NARRATIVE_DIRECTION = {
   outro: { role: 'resolution or suspended ending', state: 'the protagonist reaches a changed emotional state, even if the plot remains open', action: 'leave a final image that resolves or deliberately suspends the central want' }
 };
 
-function narrativeDirectionFor(label, index) {
+function narrativeDirectionFor(label, index, total) {
   if (index === 0) return NARRATIVE_DIRECTION.intro;
-  return NARRATIVE_DIRECTION[label] || NARRATIVE_DIRECTION.verse;
+  if (index === total - 1) return label === 'outro' ? NARRATIVE_DIRECTION.outro : NARRATIVE_DIRECTION.chorus;
+  if (label === 'bridge') return NARRATIVE_DIRECTION.bridge;
+  if (index === 1) return NARRATIVE_DIRECTION.verse;
+  if (label === 'pre-chorus') return NARRATIVE_DIRECTION['pre-chorus'];
+  if (total >= 5 && index === Math.floor((total - 1) / 2)) return NARRATIVE_DIRECTION.bridge;
+  return NARRATIVE_DIRECTION['pre-chorus'];
 }
 
 function inferNarrativeMotifs(lines) {
@@ -104,8 +109,8 @@ function narrativeProfile({ motifs, creative }) {
   };
 }
 
-function buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative, previous, globalMotifs }) {
-  const direction = narrativeDirectionFor(section.label, index);
+function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, creative, previous, globalMotifs }) {
+  const direction = narrativeDirectionFor(section.label, index, total);
   const lyricLines = lyricReferences.map((line) => line.text).filter(Boolean);
   const motifs = inferNarrativeMotifs(lyricLines);
   const profile = narrativeProfile({ motifs: globalMotifs?.length ? globalMotifs : motifs, creative });
@@ -182,12 +187,12 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
   const globalMotifs = inferNarrativeMotifs(providedLyricLines(creative.lyrics));
   let previousBeat = null;
   return sections.map((section, index) => {
-    const direction = directionFor(section.label);
+    const direction = narrativeDirectionFor(section.label, index, sections.length);
     const sceneId = `scene_${String(index + 1).padStart(2, '0')}`;
     const continuityRefs = ['character_01', 'location_01', 'style_01'];
     const lyricMoments = lyricMomentsFor(section, analysis.lyricAlignment);
     const lyricReferences = lyricReferencesFor({ section, sectionIndex: index, sections, lyrics: creative.lyrics, alignment: analysis.lyricAlignment });
-    const narrative = buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative, previous: previousBeat, globalMotifs });
+    const narrative = buildNarrativeBeat({ sceneId, section, index, total: sections.length, lyricReferences, creative, previous: previousBeat, globalMotifs });
     const narrativePrompt = `Narrative continuity: ${narrative.continuityFrom ? `continue from ${narrative.continuityFrom};` : 'begin the story;'} Arc role: ${narrative.arcRole}. Subject: ${narrative.subject}. Scene: ${narrative.scene} Character action: ${narrative.characterAction} State transition: ${narrative.stateBefore} → ${narrative.stateAfter}. ${narrative.carryForward}`;
     const lyricCueText = lyricMoments.length
       ? `Lyric moments to honor: ${lyricMoments.map((moment) => `"${moment.text}" (${moment.startSeconds.toFixed(3)}-${moment.endSeconds.toFixed(3)}s)`).join(' | ')}.`

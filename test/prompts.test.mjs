@@ -77,6 +77,24 @@ test('carries subject, setting, motifs, and state across narrative scene blocks'
   assert.ok(scenes[2].prompt.includes('visual payoff'));
 });
 
+test('uses an index-based story arc when section labels repeat', () => {
+  const sections = Array.from({ length: 5 }, (_, index) => ({
+    id: `chorus_${String(index + 1).padStart(2, '0')}`,
+    label: 'chorus',
+    startSeconds: index * 8,
+    endSeconds: (index + 1) * 8,
+    confidence: 0.2
+  }));
+  const scenes = generateScenePrompts({ sections, creative: { lyrics: 'A character wants a change.' } });
+  assert.deepEqual(scenes.map((scene) => scene.narrative.arcRole), [
+    'establishing setup',
+    'character complication',
+    'reversal or revelation',
+    'rising threshold',
+    'visual payoff'
+  ]);
+});
+
 test('builds a reusable style bible from creative intent', () => {
   const bible = buildStyleBible({ creative: { brief: 'A surreal night journey.', visualStyle: 'Neon dreamscape.' } });
   assert.equal(bible.visualThesis, 'A surreal night journey.');
