@@ -202,3 +202,20 @@ test('completed alignment jobs expose downloadable LRC artifacts', async () => {
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('keeps transcription benchmark mode private by default', async () => {
+  const server = createVerseVisionServer({ port: 0, host: '127.0.0.1', alignmentJobsEnabled: true, acousticAligner: async () => ({}) });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const form = new FormData();
+    form.append('spec', JSON.stringify({ schema: 'versevision/blueprint-request/v1', source: { kind: 'upload' }, alignment: { mode: 'transcription' } }));
+    form.append('audio', new Blob([makeSilentWav()], { type: 'audio/wav' }), 'track.wav');
+    const response = await fetch(`http://127.0.0.1:${address.port}/v1/alignment/jobs`, { method: 'POST', body: form });
+    const body = await response.json();
+    assert.equal(response.status, 404);
+    assert.equal(body.error.code, 'not_found');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

@@ -66,3 +66,19 @@ test('rejects acoustic jobs when the remote worker is not configured', () => {
   const manager = new AlignmentJobManager();
   assert.throws(() => manager.create({ input: { alignment: { mode: 'acoustic' } }, audioBytes: Buffer.from('audio') }), { code: 'alignment_worker_not_configured' });
 });
+
+test('supports gated transcription benchmark jobs without supplied lyrics', async () => {
+  const manager = new AlignmentJobManager({
+    allowTranscription: true,
+    acousticAligner: async ({ lyrics }) => ({ mode: 'transcription', text: lyrics ? 'unexpected' : 'blind transcript', words: [], warnings: [] })
+  });
+  const job = manager.create({
+    input: { schema: 'versevision/blueprint-request/v1', source: { kind: 'upload' }, alignment: { mode: 'transcription' } },
+    audioBytes: makeSilentWav(),
+    filename: 'track.wav',
+    mimeType: 'audio/wav'
+  });
+  await waitForCompletion(job);
+  assert.equal(job.status, 'completed');
+  assert.equal(job.result.transcription.text, 'blind transcript');
+});

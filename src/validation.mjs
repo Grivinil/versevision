@@ -127,7 +127,7 @@ function validateAlignment(errors, alignment, creative) {
     return;
   }
   rejectUnknown(errors, alignment, new Set(['mode']), path);
-  if (!['provisional', 'acoustic'].includes(alignment.mode)) add(errors, `${path}.mode`, 'must be provisional or acoustic');
+  if (!['provisional', 'acoustic', 'transcription'].includes(alignment.mode)) add(errors, `${path}.mode`, 'must be provisional, acoustic, or transcription');
   if (alignment.mode === 'acoustic' && typeof creative?.lyrics !== 'string') add(errors, 'creative.lyrics', 'is required when alignment.mode is acoustic');
 }
 

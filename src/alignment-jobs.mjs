@@ -17,9 +17,10 @@ function jobError(code, message, statusCode = 400) {
 }
 
 export class AlignmentJobManager {
-  constructor({ acousticAligner, maxQueue = DEFAULT_MAX_QUEUE, concurrency = DEFAULT_CONCURRENCY, ttlMs = DEFAULT_TTL_MS } = {}) {
+  constructor({ acousticAligner, allowTranscription = false, maxQueue = DEFAULT_MAX_QUEUE, concurrency = DEFAULT_CONCURRENCY, ttlMs = DEFAULT_TTL_MS } = {}) {
     this.kind = 'memory';
     this.acousticAligner = acousticAligner;
+    this.allowTranscription = allowTranscription;
     this.maxQueue = Math.max(1, Number(maxQueue) || DEFAULT_MAX_QUEUE);
     this.concurrency = Math.max(1, Number(concurrency) || DEFAULT_CONCURRENCY);
     this.ttlMs = Math.max(60_000, Number(ttlMs) || DEFAULT_TTL_MS);
@@ -41,7 +42,8 @@ export class AlignmentJobManager {
 
   create({ input, audioBytes, filename, mimeType, idempotencyKey } = {}) {
     this.prune();
-    if (input?.alignment?.mode !== 'acoustic') throw jobError('acoustic_mode_required', 'Alignment jobs require alignment.mode = acoustic.');
+    const mode = input?.alignment?.mode;
+    if (mode !== 'acoustic' && !(mode === 'transcription' && this.allowTranscription)) throw jobError('acoustic_mode_required', 'Alignment jobs require alignment.mode = acoustic.');
     if (typeof this.acousticAligner !== 'function') throw jobError('alignment_worker_not_configured', 'Acoustic alignment is not configured on this service.', 503);
     if (!audioBytes?.length) throw jobError('invalid_audio', 'Alignment jobs require a non-empty audio payload.');
     if (idempotencyKey && this.idempotency.has(idempotencyKey)) return this.jobs.get(this.idempotency.get(idempotencyKey));
@@ -103,14 +105,28 @@ export class AlignmentJobManager {
     job.status = 'running';
     job.updatedAt = Date.now();
     try {
+      const mode = job.input.alignment?.mode;
       const analysis = await analyzeAudioBufferAsync({
         buffer: job.audioBytes,
         mimeType: job.mimeType,
         filename: job.filename,
         lyrics: job.input.creative?.lyrics,
         lyricsMode: job.input.creative?.lyricsMode,
-        acousticAligner: this.acousticAligner
+        acousticAligner: mode === 'acoustic' ? this.acousticAligner : undefined
       });
+      if (mode === 'transcription') {
+        const transcription = await this.acousticAligner({
+          lyrics: '',
+          lyricsSource: 'none',
+          sections: analysis.analysis.sections,
+          beatGrid: analysis.analysis.beatGrid,
+          durationSeconds: analysis.source.durationSeconds,
+          audioBytes: job.audioBytes
+        });
+        job.result = { source: analysis.source, transcription, warnings: transcription.warnings || [] };
+        job.status = 'completed';
+        return;
+      }
       const scenes = generateScenePrompts({
         sections: analysis.analysis.sections,
         creative: job.input.creative,

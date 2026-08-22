@@ -45,6 +45,18 @@ readiness issue instead of a surprise timeout on the first customer job.
 
 The response is `202 Accepted` with a `jobId`. `Idempotency-Key` may be supplied to prevent duplicate remote jobs.
 
+## Private transcription benchmark
+
+The customer-facing acoustic route requires supplied lyrics. For blind model evaluation only, the service has a gated
+`alignment.mode = "transcription"` job mode. It is disabled unless the API service explicitly sets:
+
+```text
+VERSEVISION_TRANSCRIPTION_BENCHMARK=1
+```
+
+This mode returns WhisperX's transcript and word timings without lyric comparison. Keep it disabled outside private
+evaluation; transcription jobs consume the same CPU-heavy worker as acoustic alignment.
+
 ## Poll status
 
 `GET /v1/alignment/jobs/{jobId}` returns `queued`, `running`, `completed`, or `failed`. A completed result contains the acoustic `lyricAlignment`, confidence-gated scene prompts, and warnings. Audio bytes are discarded from the in-process queue after processing.

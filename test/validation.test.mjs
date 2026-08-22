@@ -69,3 +69,8 @@ test('accepts acoustic alignment only with supplied lyrics', () => {
   assert.equal(invalid.ok, false);
   assert.ok(invalid.errors.some((error) => error.path === 'creative.lyrics'));
 });
+
+test('accepts transcription benchmark mode without supplied lyrics', () => {
+  const result = validateBlueprintRequest({ ...validRequest, alignment: { mode: 'transcription' } });
+  assert.equal(result.ok, true);
+});

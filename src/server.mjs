@@ -144,13 +144,14 @@ async function handlePreview(request, response, { acousticAligner } = {}) {
   }
 }
 
-async function handleAlignmentJobCreate(request, response, { enabled, jobs } = {}) {
+async function handleAlignmentJobCreate(request, response, { enabled, transcriptionBenchmarkEnabled = false, jobs } = {}) {
   const id = requestId();
   if (!enabled) return sendError(response, 501, id, 'alignment_jobs_disabled', 'Acoustic alignment jobs are disabled until the job gate is explicitly enabled.', undefined, false);
   try {
     const { input, uploadedAudio } = await parseRequestPayload(request);
     const validation = validateBlueprintRequest(input);
     if (!validation.ok) return sendJson(response, 400, { schema: 'versevision/error/v1', requestId: id, error: { code: 'invalid_request', message: 'Request failed schema validation.', field: validation.errors[0]?.path, retryable: false }, details: validation.errors });
+    if (input.alignment?.mode === 'transcription' && !transcriptionBenchmarkEnabled) return sendError(response, 404, id, 'not_found', 'The transcription benchmark route is private and disabled.', undefined, false);
     let audioBytes;
     let filename;
     let mimeType;
@@ -191,7 +192,7 @@ async function handleBlueprint(request, response, { blueprintEnabled, paymentVer
   }
 }
 
-export function createVerseVisionServer({ port = Number(process.env.PORT || DEFAULT_PORT), host = process.env.HOST || DEFAULT_HOST, blueprintEnabled = process.env.VERSEVISION_BLUEPRINT_ENABLED === '1', alignmentJobsEnabled = process.env.VERSEVISION_ALIGNMENT_JOBS_ENABLED === '1', paymentVerifier, acousticAligner: configuredAcousticAligner } = {}) {
+export function createVerseVisionServer({ port = Number(process.env.PORT || DEFAULT_PORT), host = process.env.HOST || DEFAULT_HOST, blueprintEnabled = process.env.VERSEVISION_BLUEPRINT_ENABLED === '1', alignmentJobsEnabled = process.env.VERSEVISION_ALIGNMENT_JOBS_ENABLED === '1', transcriptionBenchmarkEnabled = process.env.VERSEVISION_TRANSCRIPTION_BENCHMARK === '1', paymentVerifier, acousticAligner: configuredAcousticAligner } = {}) {
   let acousticAligner = null;
   try {
     acousticAligner = configuredAcousticAligner || createWhisperXAligner();
@@ -200,10 +201,10 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
   }
   let alignmentJobs;
   try {
-    alignmentJobs = createAlignmentJobManager({ acousticAligner, enabled: alignmentJobsEnabled && Boolean(acousticAligner) });
+    alignmentJobs = createAlignmentJobManager({ acousticAligner, allowTranscription: transcriptionBenchmarkEnabled, enabled: alignmentJobsEnabled && Boolean(acousticAligner) });
   } catch (error) {
     console.warn(`[versevision] durable alignment storage disabled: ${error.message}`);
-    alignmentJobs = createAlignmentJobManager({ acousticAligner, enabled: alignmentJobsEnabled && Boolean(acousticAligner), forceMemory: true });
+    alignmentJobs = createAlignmentJobManager({ acousticAligner, allowTranscription: transcriptionBenchmarkEnabled, enabled: alignmentJobsEnabled && Boolean(acousticAligner), forceMemory: true });
   }
   const server = createHttpServer(async (request, response) => {
     const route = new URL(request.url || '/', 'http://localhost').pathname;
@@ -232,7 +233,7 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
         }
       });
     }
-    if (request.method === 'POST' && route === '/v1/alignment/jobs') return void handleAlignmentJobCreate(request, response, { enabled: alignmentJobsEnabled, jobs: alignmentJobs });
+    if (request.method === 'POST' && route === '/v1/alignment/jobs') return void handleAlignmentJobCreate(request, response, { enabled: alignmentJobsEnabled, transcriptionBenchmarkEnabled, jobs: alignmentJobs });
     const lyricDownloadMatch = route.match(/^\/v1\/alignment\/jobs\/([^/]+)\/lyrics(?:\.(enhanced))?\.lrc$/);
     if (request.method === 'GET' && lyricDownloadMatch) {
       const job = await alignmentJobs.get(lyricDownloadMatch[1]);

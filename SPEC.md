@@ -95,6 +95,9 @@ Completed jobs also provide direct lyric downloads:
 - `GET /v1/alignment/jobs/{jobId}/lyrics.lrc` returns a standard line-timed `.lrc` file.
 - `GET /v1/alignment/jobs/{jobId}/lyrics.enhanced.lrc` returns enhanced LRC with word timestamps where available.
 
+The optional `alignment.mode = "transcription"` is a private benchmark mode only. It must be explicitly enabled by the
+server and returns a WhisperX transcript without supplied lyrics; it is not advertised as a public catalog route.
+
 ## Full response schema: `versevision/blueprint/v1`
 
 ```json

@@ -32,10 +32,11 @@ function normalizedRow(row) {
 }
 
 export class SupabaseAlignmentJobManager {
-  constructor({ acousticAligner, enabled = false, url = process.env.SUPABASE_URL, serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY, bucket = process.env.VERSEVISION_ALIGNMENT_BUCKET || 'versevision-audio', pollMs = 3000 } = {}) {
+  constructor({ acousticAligner, allowTranscription = false, enabled = false, url = process.env.SUPABASE_URL, serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY, bucket = process.env.VERSEVISION_ALIGNMENT_BUCKET || 'versevision-audio', pollMs = 3000 } = {}) {
     if (!url || !serviceRoleKey) throw new Error('Supabase alignment storage requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
     this.kind = 'supabase';
     this.acousticAligner = acousticAligner;
+    this.allowTranscription = allowTranscription;
     this.enabled = enabled;
     this.baseUrl = url.replace(/\/$/, '');
     this.serviceRoleKey = serviceRoleKey;
@@ -104,7 +105,8 @@ export class SupabaseAlignmentJobManager {
   }
 
   async create({ input, audioBytes, filename, mimeType, idempotencyKey } = {}) {
-    if (input?.alignment?.mode !== 'acoustic') throw jobError('acoustic_mode_required', 'Alignment jobs require alignment.mode = acoustic.');
+    const mode = input?.alignment?.mode;
+    if (mode !== 'acoustic' && !(mode === 'transcription' && this.allowTranscription)) throw jobError('acoustic_mode_required', 'Alignment jobs require alignment.mode = acoustic.');
     if (typeof this.acousticAligner !== 'function') throw jobError('alignment_worker_not_configured', 'Acoustic alignment is not configured on this service.', 503);
     if (!audioBytes?.length) throw jobError('invalid_audio', 'Alignment jobs require a non-empty audio payload.');
     await this.ensureBucket();
@@ -185,7 +187,13 @@ export class SupabaseAlignmentJobManager {
   async run(job) {
     try {
       const bytes = await this.downloadAudio(job.audioPath);
-      const analysis = await analyzeAudioBufferAsync({ buffer: bytes, mimeType: job.mimeType, filename: job.filename, lyrics: job.input.creative?.lyrics, lyricsMode: job.input.creative?.lyricsMode, acousticAligner: this.acousticAligner });
+      const mode = job.input.alignment?.mode;
+      const analysis = await analyzeAudioBufferAsync({ buffer: bytes, mimeType: job.mimeType, filename: job.filename, lyrics: job.input.creative?.lyrics, lyricsMode: job.input.creative?.lyricsMode, acousticAligner: mode === 'acoustic' ? this.acousticAligner : undefined });
+      if (mode === 'transcription') {
+        const transcription = await this.acousticAligner({ lyrics: '', lyricsSource: 'none', sections: analysis.analysis.sections, beatGrid: analysis.analysis.beatGrid, durationSeconds: analysis.source.durationSeconds, audioBytes: bytes });
+        await this.update(job.id, { status: 'completed', result: { source: analysis.source, transcription, warnings: transcription.warnings || [] }, error: null, locked_at: null });
+        return;
+      }
       const scenes = generateScenePrompts({ sections: analysis.analysis.sections, creative: job.input.creative, analysis: analysis.analysis, output: job.input.output });
       const lyricArtifacts = buildLyricArtifacts({ alignment: analysis.analysis.lyricAlignment, lyrics: job.input.creative?.lyrics, durationSeconds: analysis.source.durationSeconds, title: job.input.source?.title });
       await this.update(job.id, {

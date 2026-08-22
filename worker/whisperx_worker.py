@@ -131,6 +131,19 @@ def preload_model():
 
 def build_alignment(lyrics: str, context: dict, asr_words: list[dict], duration: float, language: str):
     blocks = parse_lyrics(lyrics)
+    if not blocks:
+        return {
+            "mode": "transcription",
+            "source": "whisper_transcription",
+            "backend": "whisperx",
+            "language": language,
+            "durationSeconds": round(duration, 3),
+            "text": " ".join(item["text"] for item in asr_words),
+            "words": [{"text": item["text"], "startSeconds": round(float(item["start"]), 3), "endSeconds": round(float(item["end"]), 3), "source": "whisperx"} for item in asr_words],
+            "wordCount": len(asr_words),
+            "confidence": None,
+            "warnings": [{"code": "transcription_unscored", "message": "No supplied lyrics were provided for word-error comparison."}]
+        }
     sections = context.get("sections") or []
     mapped_blocks = map_blocks(blocks, sections, duration)
     lyric_tokens = []
