@@ -25,9 +25,10 @@ VERSEVISION_ALIGNMENT_RETRY_DELAY_MS=1500
 ```
 
 Configure the worker service with a healthcheck path of `/health`, keep one replica warm (disable scale-to-zero for the
-private worker), and enable automatic restart on failure. The worker image preloads WhisperX before becoming ready, and
-the health response reports `ready: true` only after the model is loaded. This makes a slow model download a deployment
-readiness issue instead of a surprise timeout on the first customer job.
+private worker), and enable automatic restart on failure. The worker supports optional model preloading with
+`WHISPERX_PRELOAD=1` and readiness gating with `WHISPERX_REQUIRE_READY=1`, but those should only be enabled when the
+Railway healthcheck window and worker memory are large enough for the model download. The default remains lazy loading
+so deployments become reachable reliably; the API retry and bounded fallback protect the first request.
 
 ## Create a job
 
