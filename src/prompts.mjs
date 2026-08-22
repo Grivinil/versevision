@@ -104,11 +104,11 @@ function narrativeProfile({ motifs, creative }) {
   };
 }
 
-function buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative, previous }) {
+function buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative, previous, globalMotifs }) {
   const direction = narrativeDirectionFor(section.label, index);
   const lyricLines = lyricReferences.map((line) => line.text).filter(Boolean);
   const motifs = inferNarrativeMotifs(lyricLines);
-  const profile = narrativeProfile({ motifs, creative });
+  const profile = narrativeProfile({ motifs: globalMotifs?.length ? globalMotifs : motifs, creative });
   const subject = profile.subject;
   const motifText = motifs.length ? motifs.map((motif) => motif.name).join(', ') : 'a recurring prop or visual motif implied by the lyric intent';
   const lyricHook = lyricLines.length ? lyricLines.slice(0, 3).join(' / ') : 'the section’s emotional turn';
@@ -177,6 +177,7 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
   const mood = Array.isArray(creative.mood) && creative.mood.length ? creative.mood.join(', ') : 'follow the emotional movement of the track';
   const genre = Array.isArray(creative.genre) && creative.genre.length ? creative.genre.join(', ') : 'music video';
   const aspectRatio = output.aspectRatio || '16:9';
+  const globalMotifs = inferNarrativeMotifs(providedLyricLines(creative.lyrics));
   let previousBeat = null;
   return sections.map((section, index) => {
     const direction = directionFor(section.label);
@@ -184,7 +185,7 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
     const continuityRefs = ['character_01', 'location_01', 'style_01'];
     const lyricMoments = lyricMomentsFor(section, analysis.lyricAlignment);
     const lyricReferences = lyricReferencesFor({ section, sectionIndex: index, sections, lyrics: creative.lyrics, alignment: analysis.lyricAlignment });
-    const narrative = buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative, previous: previousBeat });
+    const narrative = buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative, previous: previousBeat, globalMotifs });
     const narrativePrompt = `Narrative continuity: ${narrative.continuityFrom ? `continue from ${narrative.continuityFrom};` : 'begin the story;'} Arc role: ${narrative.arcRole}. Subject: ${narrative.subject}. Scene: ${narrative.scene} Character action: ${narrative.characterAction} State transition: ${narrative.stateBefore} → ${narrative.stateAfter}. ${narrative.carryForward}`;
     const lyricCueText = lyricMoments.length
       ? `Lyric moments to honor: ${lyricMoments.map((moment) => `"${moment.text}" (${moment.startSeconds.toFixed(3)}-${moment.endSeconds.toFixed(3)}s)`).join(' | ')}.`

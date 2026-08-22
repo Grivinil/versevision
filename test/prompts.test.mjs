@@ -69,6 +69,8 @@ test('carries subject, setting, motifs, and state across narrative scene blocks'
   assert.equal(scenes[0].narrative.continuityFrom, null);
   assert.equal(scenes[1].narrative.continuityFrom, 'scene_01');
   assert.equal(scenes[2].narrative.continuityFrom, 'scene_02');
+  assert.equal(scenes[0].narrative.subject, scenes[1].narrative.subject);
+  assert.equal(scenes[1].narrative.subject, scenes[2].narrative.subject);
   assert.ok(scenes[0].narrative.motifs.some((motif) => motif.name.includes('drink')));
   assert.ok(scenes.some((scene) => scene.narrative.motifs.some((motif) => motif.name.includes('academic'))));
   assert.ok(scenes[1].prompt.includes('continue from scene_01'));
