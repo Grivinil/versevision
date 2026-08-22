@@ -41,6 +41,61 @@ function providedLyricLines(lyrics) {
   return lyrics.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^\[[^\]]+\]$/.test(line));
 }
 
+const NARRATIVE_DIRECTION = {
+  intro: { role: 'establishing setup', state: 'the protagonist’s want is visible but unresolved', action: 'introduce the protagonist through a specific, readable action rather than a montage of lyric words' },
+  verse: { role: 'character complication', state: 'the protagonist meets a consequence that changes the next choice', action: 'make the protagonist pursue, avoid, or react to the lyric-driven problem in the scene' },
+  'pre-chorus': { role: 'rising threshold', state: 'pressure rises and the protagonist commits to a risky next move', action: 'turn the lyric tension into a visible decision that propels the protagonist toward the refrain' },
+  chorus: { role: 'visual payoff', state: 'the recurring motif returns at full energy and the protagonist acts instead of hesitating', action: 'pay off the established want with a memorable, repeatable visual hook' },
+  bridge: { role: 'reversal or revelation', state: 'the meaning of the recurring motif changes before the final return', action: 'reframe the protagonist, prop, or location so the audience sees the established world differently' },
+  outro: { role: 'resolution or suspended ending', state: 'the protagonist reaches a changed emotional state, even if the plot remains open', action: 'leave a final image that resolves or deliberately suspends the central want' }
+};
+
+function narrativeDirectionFor(label, index) {
+  if (index === 0) return NARRATIVE_DIRECTION.intro;
+  return NARRATIVE_DIRECTION[label] || NARRATIVE_DIRECTION.verse;
+}
+
+function inferNarrativeMotifs(lines) {
+  const text = lines.join(' ').toLowerCase();
+  const motifs = [];
+  if (/\bboba\b|\bshake\b/.test(text)) motifs.push({ name: 'a distinctive drink or handheld prop', direction: 'let it recur as a physical anchor and movement cue' });
+  if (/\bmom\b|\bmother\b|\bgrades?\b|\bmath\b|\bschool\b/.test(text)) motifs.push({ name: 'family or academic pressure', direction: 'make the pressure visible through a room, object, glance, or interruption' });
+  if (/\bbroke\b|\bpay bail\b|\bclothes\b|\bmoney\b/.test(text)) motifs.push({ name: 'money and status anxiety', direction: 'contrast what the protagonist wants with what the environment allows' });
+  if (/\bsnail\b|\bslow\b/.test(text)) motifs.push({ name: 'delayed or awkward movement', direction: 'turn the limitation into a recurring physical performance motif' });
+  if (/\btop\b|\blegendary\b|\bscary\b/.test(text)) motifs.push({ name: 'an ascent toward an unstable threshold', direction: 'increase scale and consequence without changing the protagonist’s identity' });
+  if (/\bfairy\b|\bdream\b|\bmagic\b/.test(text)) motifs.push({ name: 'a surreal escape or wish image', direction: 'foreshadow it in grounded details before allowing it to break reality' });
+  return motifs;
+}
+
+function buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative, previous }) {
+  const direction = narrativeDirectionFor(section.label, index);
+  const lyricLines = lyricReferences.map((line) => line.text).filter(Boolean);
+  const motifs = inferNarrativeMotifs(lyricLines);
+  const subject = creative.brief ? 'the central subject established by the creative brief' : 'one recurring protagonist with a stable face, silhouette, wardrobe logic, and physicality';
+  const motifText = motifs.length ? motifs.map((motif) => motif.name).join(', ') : 'a recurring prop or visual motif implied by the lyric intent';
+  const lyricHook = lyricLines.length ? lyricLines.slice(0, 3).join(' / ') : 'the section’s emotional turn';
+  const continuity = previous
+    ? `Continue directly from ${previous.id}: ${previous.stateAfter}. Keep the same protagonist, wardrobe logic, geography, and established motifs before introducing only the section’s new pressure.`
+    : 'Open with an establishing image that makes the protagonist, world, and central want legible before expanding the visual scale.';
+  const scene = index === 0
+    ? `Place the protagonist in a grounded primary location containing ${motifText}; make the environment express the tension in “${lyricHook}”.`
+    : `Move the protagonist through a connected location or a visibly changed version of the prior location; let ${motifText} cause or reveal the next turn rather than appearing as decoration.`;
+  const carryForward = previous
+    ? `Carry forward the prior scene’s anchor prop, wardrobe, color logic, and spatial direction; transform one of them only when the story state changes.`
+    : 'Establish a repeatable wardrobe, silhouette, location anchor, and prop that later scenes can recognize immediately.';
+  return {
+    arcRole: direction.role,
+    subject,
+    scene,
+    characterAction: `${direction.action}. Use “${lyricHook}” as the immediate behavioral trigger, not as a list of text to illustrate.`,
+    stateBefore: previous?.stateAfter || 'the story has not yet shown the protagonist’s want',
+    stateAfter: direction.state,
+    continuityFrom: previous?.id || null,
+    carryForward,
+    motifs
+  };
+}
+
 function lyricReferencesFor({ section, sectionIndex, sections, lyrics, alignment }) {
   const aligned = alignment?.sections?.find((item) => item.audioSectionId === section.id);
   const alignedLines = Array.isArray(aligned?.lines) ? aligned.lines : [];
@@ -82,19 +137,23 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
   const mood = Array.isArray(creative.mood) && creative.mood.length ? creative.mood.join(', ') : 'follow the emotional movement of the track';
   const genre = Array.isArray(creative.genre) && creative.genre.length ? creative.genre.join(', ') : 'music video';
   const aspectRatio = output.aspectRatio || '16:9';
+  let previousBeat = null;
   return sections.map((section, index) => {
     const direction = directionFor(section.label);
+    const sceneId = `scene_${String(index + 1).padStart(2, '0')}`;
     const continuityRefs = ['character_01', 'location_01', 'style_01'];
     const lyricMoments = lyricMomentsFor(section, analysis.lyricAlignment);
     const lyricReferences = lyricReferencesFor({ section, sectionIndex: index, sections, lyrics: creative.lyrics, alignment: analysis.lyricAlignment });
+    const narrative = buildNarrativeBeat({ sceneId, section, index, lyricReferences, creative, previous: previousBeat });
+    const narrativePrompt = `Narrative continuity: ${narrative.continuityFrom ? `continue from ${narrative.continuityFrom};` : 'begin the story;'} Arc role: ${narrative.arcRole}. Subject: ${narrative.subject}. Scene: ${narrative.scene} Character action: ${narrative.characterAction} State transition: ${narrative.stateBefore} → ${narrative.stateAfter}. ${narrative.carryForward}`;
     const lyricCueText = lyricMoments.length
       ? `Lyric moments to honor: ${lyricMoments.map((moment) => `"${moment.text}" (${moment.startSeconds.toFixed(3)}-${moment.endSeconds.toFixed(3)}s)`).join(' | ')}.`
       : '';
     const lyricDirection = lyricReferences.length
       ? `Lyric-driven visual direction: translate these supplied lines into visible action, props, and character behavior: ${lyricReferences.map((line) => `"${line.text}"`).join(' | ')}. Use acoustically aligned timing where marked; otherwise treat the lyric window as approximate and preserve narrative order.`
       : '';
-    return {
-      id: `scene_${String(index + 1).padStart(2, '0')}`,
+    const scene = {
+      id: sceneId,
       startSeconds: section.startSeconds,
       endSeconds: section.endSeconds,
       sectionId: section.id,
@@ -103,8 +162,9 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
       lyricMoments,
       lyricReferences,
       lyricDirection,
+      narrative,
       intent: direction.intent,
-      prompt: `${direction.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
+      prompt: `${direction.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${narrativePrompt} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
       negativePrompt: DEFAULT_NEGATIVE_PROMPT,
       camera: { shot: direction.camera, movement: direction.camera },
       lighting: direction.lighting,
@@ -112,6 +172,8 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
       continuityRefs,
       confidence: section.confidence
     };
+    previousBeat = { ...narrative, id: sceneId };
+    return scene;
   });
 }
 

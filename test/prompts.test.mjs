@@ -57,6 +57,24 @@ test('confidence-gates acoustic lyric cues before putting them in prompts', () =
   assert.ok(!scenes[0].prompt.includes('uncertain line'));
 });
 
+test('carries subject, setting, motifs, and state across narrative scene blocks', () => {
+  const scenes = generateScenePrompts({
+    sections: [
+      { id: 'verse_01', label: 'verse', startSeconds: 0, endSeconds: 10, confidence: 0.7 },
+      { id: 'pre_02', label: 'pre-chorus', startSeconds: 10, endSeconds: 20, confidence: 0.7 },
+      { id: 'chorus_03', label: 'chorus', startSeconds: 20, endSeconds: 30, confidence: 0.7 }
+    ],
+    creative: { lyrics: 'Boba gotta shake\nMy mom saw my grades\nWe can take it to the top' }
+  });
+  assert.equal(scenes[0].narrative.continuityFrom, null);
+  assert.equal(scenes[1].narrative.continuityFrom, 'scene_01');
+  assert.equal(scenes[2].narrative.continuityFrom, 'scene_02');
+  assert.ok(scenes[0].narrative.motifs.some((motif) => motif.name.includes('drink')));
+  assert.ok(scenes.some((scene) => scene.narrative.motifs.some((motif) => motif.name.includes('academic'))));
+  assert.ok(scenes[1].prompt.includes('continue from scene_01'));
+  assert.ok(scenes[2].prompt.includes('visual payoff'));
+});
+
 test('builds a reusable style bible from creative intent', () => {
   const bible = buildStyleBible({ creative: { brief: 'A surreal night journey.', visualStyle: 'Neon dreamscape.' } });
   assert.equal(bible.visualThesis, 'A surreal night journey.');
