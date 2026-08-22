@@ -19,6 +19,15 @@ function sendJson(response, statusCode, body) {
   response.end(JSON.stringify(body));
 }
 
+function sendText(response, statusCode, body, filename) {
+  response.writeHead(statusCode, {
+    'content-type': 'text/plain; charset=utf-8',
+    'content-disposition': `attachment; filename="${filename}"`,
+    'cache-control': 'no-store'
+  });
+  response.end(body);
+}
+
 function requestId() {
   return `vv_${randomUUID().replaceAll('-', '').slice(0, 16)}`;
 }
@@ -207,7 +216,14 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
         requestSchema: 'versevision/blueprint-request/v1', responseSchema: 'versevision/blueprint/v1',
         alignment: { backend: acousticAligner ? 'acoustic_forced' : 'meter_estimate', optional: true, jobStore: alignmentJobs.kind },
         limits: { maxAudioBytes: 25 * 1024 * 1024, maxAudioSeconds: 300, maxReferenceUrls: 8 },
-        artifacts: { lyricFormats: ['lrc', 'enhanced_lrc'], enhancedWordTiming: Boolean(acousticAligner) },
+        artifacts: {
+          lyricFormats: ['lrc', 'enhanced_lrc'],
+          enhancedWordTiming: Boolean(acousticAligner),
+          downloads: {
+            lrc: 'GET /v1/alignment/jobs/{jobId}/lyrics.lrc',
+            enhancedLrc: 'GET /v1/alignment/jobs/{jobId}/lyrics.enhanced.lrc'
+          }
+        },
         routes: {
           preview: { method: 'POST', path: '/v1/blueprint/preview', payment: 'none' },
           alignmentJob: { method: 'POST', path: '/v1/alignment/jobs', payment: 'not_enabled', enabled: Boolean(alignmentJobsEnabled && acousticAligner) },
@@ -217,6 +233,15 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
       });
     }
     if (request.method === 'POST' && route === '/v1/alignment/jobs') return void handleAlignmentJobCreate(request, response, { enabled: alignmentJobsEnabled, jobs: alignmentJobs });
+    const lyricDownloadMatch = route.match(/^\/v1\/alignment\/jobs\/([^/]+)\/lyrics(?:\.(enhanced))?\.lrc$/);
+    if (request.method === 'GET' && lyricDownloadMatch) {
+      const job = await alignmentJobs.get(lyricDownloadMatch[1]);
+      if (!job) return sendError(response, 404, requestId(), 'job_not_found', 'Alignment job was not found or has expired.', undefined, false);
+      if (job.status !== 'completed' || !job.result?.artifacts) return sendError(response, 409, requestId(), 'artifact_not_ready', 'Lyric artifacts are available after alignment completes.', undefined, true);
+      const enhanced = Boolean(lyricDownloadMatch[2]);
+      const artifact = enhanced ? job.result.artifacts.enhancedLrc : job.result.artifacts.lrc;
+      return sendText(response, 200, artifact || '', `${job.id}${enhanced ? '.enhanced' : ''}.lrc`);
+    }
     const alignmentStatusMatch = route.match(/^\/v1\/alignment\/jobs\/([^/]+)$/);
     if (request.method === 'GET' && alignmentStatusMatch) {
       const job = await alignmentJobs.get(alignmentStatusMatch[1]);

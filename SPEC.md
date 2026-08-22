@@ -90,6 +90,11 @@ When lyrics are supplied, `analysis.lyricAlignment` includes provisional line- a
 
 `POST /v1/alignment/jobs` accepts the same logical request plus `alignment.mode = "acoustic"` and returns `202 Accepted` with a job ID. `GET /v1/alignment/jobs/{jobId}` exposes the bounded asynchronous result. Normal preview requests do not invoke the remote worker.
 
+Completed jobs also provide direct lyric downloads:
+
+- `GET /v1/alignment/jobs/{jobId}/lyrics.lrc` returns a standard line-timed `.lrc` file.
+- `GET /v1/alignment/jobs/{jobId}/lyrics.enhanced.lrc` returns enhanced LRC with word timestamps where available.
+
 ## Full response schema: `versevision/blueprint/v1`
 
 ```json

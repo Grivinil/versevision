@@ -154,3 +154,51 @@ test('acoustic alignment jobs are opt-in and expose a pollable result', async ()
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('completed alignment jobs expose downloadable LRC artifacts', async () => {
+  const server = createVerseVisionServer({
+    port: 0,
+    host: '127.0.0.1',
+    alignmentJobsEnabled: true,
+    acousticAligner: async () => ({
+      mode: 'acoustic_forced',
+      source: 'acoustic_forced_alignment',
+      backend: 'acoustic_forced',
+      confidence: 0.9,
+      sections: [{
+        audioSectionId: 'full_track_01',
+        lines: [{
+          text: 'Sun in the sky',
+          startSeconds: 0.5,
+          endSeconds: 2,
+          confidence: 0.9,
+          source: 'acoustic_forced_alignment',
+          words: [{ text: 'Sun', startSeconds: 0.5, endSeconds: 0.9, confidence: 0.9, source: 'acoustic_forced_alignment' }, { text: 'in', startSeconds: 0.9, endSeconds: 1.2, confidence: 0.9, source: 'acoustic_forced_alignment' }, { text: 'the', startSeconds: 1.2, endSeconds: 1.5, confidence: 0.9, source: 'acoustic_forced_alignment' }, { text: 'sky', startSeconds: 1.5, endSeconds: 2, confidence: 0.9, source: 'acoustic_forced_alignment' }]
+        }]
+      }],
+      lineCount: 1,
+      wordCount: 4,
+      warnings: []
+    })
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const form = new FormData();
+    form.append('spec', JSON.stringify({ schema: 'versevision/blueprint-request/v1', source: { kind: 'upload', title: 'LRC test' }, alignment: { mode: 'acoustic' }, creative: { lyrics: 'Sun in the sky', lyricsMode: 'provided' } }));
+    form.append('audio', new Blob([makeSilentWav()], { type: 'audio/wav' }), 'track.wav');
+    const created = await (await fetch(`http://127.0.0.1:${address.port}/v1/alignment/jobs`, { method: 'POST', body: form })).json();
+    let status = created;
+    for (let attempt = 0; attempt < 100 && status.status !== 'completed'; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      status = await (await fetch(`http://127.0.0.1:${address.port}/v1/alignment/jobs/${created.jobId}`)).json();
+    }
+    const response = await fetch(`http://127.0.0.1:${address.port}/v1/alignment/jobs/${created.jobId}/lyrics.enhanced.lrc`);
+    const body = await response.text();
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-disposition'), /\.enhanced\.lrc/);
+    assert.match(body, /<00:00\.50>Sun/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
