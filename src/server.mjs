@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { analyzeAudioBufferAsync, MAX_AUDIO_BYTES } from './audio.mjs';
 import { fetchAudioUrl } from './ingest.mjs';
 import { parseMultipartBody } from './multipart.mjs';
-import { validateBlueprintRequest } from './validation.mjs';
+import { NARRATIVE_MODES, validateBlueprintRequest } from './validation.mjs';
 import { buildBlueprintResponse } from './blueprint.mjs';
 import { createWhisperXAligner } from './acoustic-worker.mjs';
 import { createAlignmentJobManager } from './alignment-jobs.mjs';
@@ -215,6 +215,7 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
       return sendJson(response, 200, {
         schema: 'versevision/catalog/v1', product: 'VerseVision', version: '0.1.0', status: 'preview_analysis',
         requestSchema: 'versevision/blueprint-request/v1', responseSchema: 'versevision/blueprint/v1',
+        narrativeModes: [...NARRATIVE_MODES], defaultNarrativeMode: 'song',
         alignment: { backend: acousticAligner ? 'acoustic_forced' : 'meter_estimate', optional: true, jobStore: alignmentJobs.kind },
         limits: { maxAudioBytes: 25 * 1024 * 1024, maxAudioSeconds: 300, maxReferenceUrls: 8 },
         artifacts: {
