@@ -6,9 +6,10 @@ test('does not configure a worker when no endpoint is supplied', () => {
   assert.equal(createWhisperXAligner({ endpoint: '' }), null);
 });
 
-test('requires HTTPS for remote alignment workers', () => {
+test('requires HTTPS except for local and Railway private-network workers', () => {
   assert.throws(() => workerUrl('http://alignment.example.test'), /HTTPS/);
   assert.equal(workerUrl('http://127.0.0.1:8090'), 'http://127.0.0.1:8090');
+  assert.equal(workerUrl('http://whisperx.railway.internal:8090'), 'http://whisperx.railway.internal:8090');
 });
 
 test('posts bounded audio and alignment context to the configured worker', async () => {

@@ -4,7 +4,9 @@ function workerUrl(value) {
   if (!value) return null;
   const url = new URL(value);
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('alignment worker URL must use HTTP(S)');
-  if (url.protocol === 'http:' && !['localhost', '127.0.0.1', '::1'].includes(url.hostname)) throw new Error('remote alignment workers must use HTTPS');
+  const isLocal = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+  const isRailwayPrivate = url.hostname === 'railway.internal' || url.hostname.endsWith('.railway.internal');
+  if (url.protocol === 'http:' && !isLocal && !isRailwayPrivate) throw new Error('remote alignment workers must use HTTPS unless using Railway private networking');
   return url.href.replace(/\/$/, '');
 }
 

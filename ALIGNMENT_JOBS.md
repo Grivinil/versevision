@@ -12,7 +12,9 @@ VERSEVISION_ALIGNMENT_WORKER_TOKEN=<masked service token>
 VERSEVISION_ALIGNMENT_JOBS_ENABLED=1
 ```
 
-The worker URL must be HTTPS unless it points to localhost. The token is used only for service-to-service authentication.
+The worker URL must be HTTPS unless it points to localhost or a Railway `*.railway.internal` private-network hostname.
+Railway private traffic is encrypted inside its WireGuard network, so the internal URL uses `http`. The token is used
+only for service-to-service authentication.
 
 ## Create a job
 
