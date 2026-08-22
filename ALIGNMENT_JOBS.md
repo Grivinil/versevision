@@ -16,6 +16,18 @@ The worker URL must be HTTPS unless it points to localhost or a Railway `*.railw
 Railway private traffic is encrypted inside its WireGuard network, so the internal URL uses `http`. The token is used
 only for service-to-service authentication.
 
+The Node service retries transient worker failures twice with exponential backoff before retaining provisional timing.
+These values can be tuned, but should remain bounded:
+
+```text
+VERSEVISION_ALIGNMENT_RETRY_ATTEMPTS=2
+VERSEVISION_ALIGNMENT_RETRY_DELAY_MS=1500
+```
+
+Configure the worker service with a healthcheck path of `/health`, keep one replica warm (disable scale-to-zero for the
+private worker), and enable automatic restart on failure. The worker may report `loaded: false` while WhisperX is still
+warming; alignment requests remain protected by the timeout and retry policy.
+
 ## Create a job
 
 `POST /v1/alignment/jobs` accepts the same JSON-plus-audio multipart transport as preview. Add:

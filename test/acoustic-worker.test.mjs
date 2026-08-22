@@ -33,3 +33,21 @@ test('posts bounded audio and alignment context to the configured worker', async
     globalThis.fetch = originalFetch;
   }
 });
+
+test('retries transient worker fetch failures with a bounded backoff', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    if (calls === 1) throw new TypeError('fetch failed');
+    return new Response(JSON.stringify({ mode: 'acoustic_forced', sections: [], warnings: [] }), { status: 200 });
+  };
+  try {
+    const aligner = createWhisperXAligner({ endpoint: 'http://127.0.0.1:8090', timeoutMs: 5000, retryAttempts: 1, retryDelayMs: 100 });
+    const result = await aligner({ lyrics: 'retry me', lyricsSource: 'provided', sections: [], beatGrid: null, durationSeconds: 2, audioBytes: Buffer.from('mp3') });
+    assert.equal(result.mode, 'acoustic_forced');
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
