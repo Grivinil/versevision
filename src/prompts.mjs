@@ -36,6 +36,46 @@ function lyricMomentsFor(section, alignment) {
   }));
 }
 
+function providedLyricLines(lyrics) {
+  if (typeof lyrics !== 'string') return [];
+  return lyrics.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !/^\[[^\]]+\]$/.test(line));
+}
+
+function lyricReferencesFor({ section, sectionIndex, sections, lyrics, alignment }) {
+  const aligned = alignment?.sections?.find((item) => item.audioSectionId === section.id);
+  const alignedLines = Array.isArray(aligned?.lines) ? aligned.lines : [];
+  const alignedText = new Set(alignedLines.map((line) => String(line.text || '').trim().toLowerCase()).filter(Boolean));
+  const allProvided = providedLyricLines(lyrics);
+  if (!allProvided.length) return [];
+
+  // Acoustic output is authoritative where it exists. Fill the visual brief with
+  // the remaining supplied lines using a bounded, explicitly approximate window.
+  // This keeps the lyric content visible without pretending missing timestamps
+  // were acoustically measured.
+  const totalDuration = sections.at(-1)?.endSeconds || 0;
+  const startRatio = totalDuration > 0 ? section.startSeconds / totalDuration : sectionIndex / sections.length;
+  const endRatio = totalDuration > 0 ? section.endSeconds / totalDuration : (sectionIndex + 1) / sections.length;
+  const start = Math.max(0, Math.floor(allProvided.length * startRatio));
+  const end = Math.min(allProvided.length, Math.max(start + 1, Math.ceil(allProvided.length * endRatio)));
+  const windowLines = allProvided.slice(start, end);
+  const acoustic = alignedLines.filter((line) => alignedText.has(String(line.text || '').trim().toLowerCase())).map((line) => ({
+    text: line.text,
+    startSeconds: line.startSeconds,
+    endSeconds: line.endSeconds,
+    confidence: line.confidence,
+    source: line.source || 'acoustic_forced_alignment',
+    timing: 'acoustic',
+    promptEligible: Number(line.confidence) >= 0.65
+  }));
+  const acousticText = new Set(acoustic.map((line) => String(line.text).trim().toLowerCase()));
+  const references = [...acoustic];
+  for (const text of windowLines) {
+    if (acousticText.has(text.toLowerCase())) continue;
+    references.push({ text, confidence: null, source: 'provided_lyrics_reference', timing: 'approximate', promptEligible: false });
+  }
+  return references.slice(0, 8);
+}
+
 export function generateScenePrompts({ sections = [], creative = {}, analysis = {}, output = {} } = {}) {
   const brief = creative.brief || 'Create a coherent visual interpretation of the music.';
   const style = creative.visualStyle || 'Cinematic, intentional visual storytelling with consistent subjects and locations.';
@@ -46,8 +86,12 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
     const direction = directionFor(section.label);
     const continuityRefs = ['character_01', 'location_01', 'style_01'];
     const lyricMoments = lyricMomentsFor(section, analysis.lyricAlignment);
+    const lyricReferences = lyricReferencesFor({ section, sectionIndex: index, sections, lyrics: creative.lyrics, alignment: analysis.lyricAlignment });
     const lyricCueText = lyricMoments.length
       ? `Lyric moments to honor: ${lyricMoments.map((moment) => `"${moment.text}" (${moment.startSeconds.toFixed(3)}-${moment.endSeconds.toFixed(3)}s)`).join(' | ')}.`
+      : '';
+    const lyricDirection = lyricReferences.length
+      ? `Lyric-driven visual direction: translate these supplied lines into visible action, props, and character behavior: ${lyricReferences.map((line) => `"${line.text}"`).join(' | ')}. Use acoustically aligned timing where marked; otherwise treat the lyric window as approximate and preserve narrative order.`
       : '';
     return {
       id: `scene_${String(index + 1).padStart(2, '0')}`,
@@ -57,12 +101,14 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
       sectionLabel: section.label,
       beatCues: beatCues(section, analysis.beatGrid),
       lyricMoments,
+      lyricReferences,
+      lyricDirection,
       intent: direction.intent,
-      prompt: `${direction.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${lyricCueText} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
+      prompt: `${direction.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
       negativePrompt: DEFAULT_NEGATIVE_PROMPT,
       camera: { shot: direction.camera, movement: direction.camera },
       lighting: direction.lighting,
-      edit: { cutOnBeat: section.label === 'chorus' || section.label === 'pre-chorus', transition: direction.transition, lyricCueCount: lyricMoments.length, lyricCuePolicy: 'confidence_gated' },
+      edit: { cutOnBeat: section.label === 'chorus' || section.label === 'pre-chorus', transition: direction.transition, lyricCueCount: lyricMoments.length, lyricReferenceCount: lyricReferences.length, lyricCuePolicy: 'confidence_gated_with_approximate_text_references' },
       continuityRefs,
       confidence: section.confidence
     };
