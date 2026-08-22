@@ -4,7 +4,9 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     WHISPERX_DEVICE=cpu \
     WHISPERX_COMPUTE_TYPE=int8 \
-    WHISPERX_MODEL=small
+    WHISPERX_MODEL=small \
+    WHISPERX_PRELOAD=1 \
+    WHISPERX_REQUIRE_READY=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg build-essential \

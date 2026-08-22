@@ -120,6 +120,15 @@ class WhisperXEngine:
 ENGINE = WhisperXEngine()
 
 
+@app.on_event("startup")
+def preload_model():
+    # Fail deployment readiness rather than accepting a first job while the
+    # model is still downloading/loading. This prevents caller timeouts on the
+    # first request after a worker restart.
+    if os.getenv("WHISPERX_PRELOAD", "0") == "1":
+        ENGINE.load()
+
+
 def build_alignment(lyrics: str, context: dict, asr_words: list[dict], duration: float, language: str):
     blocks = parse_lyrics(lyrics)
     sections = context.get("sections") or []
@@ -207,7 +216,10 @@ def build_alignment(lyrics: str, context: dict, asr_words: list[dict], duration:
 
 @app.get("/health")
 def health():
-    return {"service": "versevision-whisperx-worker", "status": "ok", "loaded": ENGINE.model is not None}
+    loaded = ENGINE.model is not None
+    if os.getenv("WHISPERX_REQUIRE_READY", "0") == "1" and not loaded:
+        raise HTTPException(status_code=503, detail="WhisperX model is still loading")
+    return {"service": "versevision-whisperx-worker", "status": "ok", "loaded": loaded, "ready": loaded}
 
 
 @app.post("/align")
