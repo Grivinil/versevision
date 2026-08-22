@@ -116,7 +116,7 @@ export class AlignmentJobManager {
       });
       if (mode === 'transcription') {
         const transcription = await this.acousticAligner({
-          lyrics: '',
+          lyrics: ' ',
           lyricsSource: 'none',
           sections: analysis.analysis.sections,
           beatGrid: analysis.analysis.beatGrid,

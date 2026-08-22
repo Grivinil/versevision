@@ -190,7 +190,7 @@ export class SupabaseAlignmentJobManager {
       const mode = job.input.alignment?.mode;
       const analysis = await analyzeAudioBufferAsync({ buffer: bytes, mimeType: job.mimeType, filename: job.filename, lyrics: job.input.creative?.lyrics, lyricsMode: job.input.creative?.lyricsMode, acousticAligner: mode === 'acoustic' ? this.acousticAligner : undefined });
       if (mode === 'transcription') {
-        const transcription = await this.acousticAligner({ lyrics: '', lyricsSource: 'none', sections: analysis.analysis.sections, beatGrid: analysis.analysis.beatGrid, durationSeconds: analysis.source.durationSeconds, audioBytes: bytes });
+        const transcription = await this.acousticAligner({ lyrics: ' ', lyricsSource: 'none', sections: analysis.analysis.sections, beatGrid: analysis.analysis.beatGrid, durationSeconds: analysis.source.durationSeconds, audioBytes: bytes });
         await this.update(job.id, { status: 'completed', result: { source: analysis.source, transcription, warnings: transcription.warnings || [] }, error: null, locked_at: null });
         return;
       }
