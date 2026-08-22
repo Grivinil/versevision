@@ -93,7 +93,8 @@ class WhisperXEngine:
         device = os.getenv("WHISPERX_DEVICE", "cpu")
         compute_type = os.getenv("WHISPERX_COMPUTE_TYPE", "int8" if device == "cpu" else "float16")
         model_name = os.getenv("WHISPERX_MODEL", "small")
-        self.model = whisperx.load_model(model_name, device, compute_type=compute_type)
+        vad_method = os.getenv("WHISPERX_VAD_METHOD", "silero")
+        self.model = whisperx.load_model(model_name, device, compute_type=compute_type, vad_method=vad_method)
         self.device = device
 
     def transcribe_and_align(self, path: str):
