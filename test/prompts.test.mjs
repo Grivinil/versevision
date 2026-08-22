@@ -95,6 +95,32 @@ test('uses an index-based story arc when section labels repeat', () => {
   ]);
 });
 
+test('derives concrete recurring details for narrative-specific lyrics', () => {
+  const bacon = generateScenePrompts({
+    sections: [
+      { id: 'intro', label: 'intro', startSeconds: 0, endSeconds: 10 },
+      { id: 'middle', label: 'verse', startSeconds: 10, endSeconds: 20 },
+      { id: 'end', label: 'verse', startSeconds: 20, endSeconds: 30 }
+    ],
+    creative: { lyrics: 'Guy walks down the street\nJust a nickel in his pocket\nHe sees a mustache stylist\nThe stylist used bacon grease' }
+  });
+  assert.match(bacon[0].narrative.subject, /mustache/);
+  assert.match(bacon[0].narrative.setting, /five-cent sign/);
+  assert.match(bacon[1].narrative.spatialRule, /mirror/);
+  assert.match(bacon[2].prompt, /bacon-greased mustache/);
+
+  const goodDay = generateScenePrompts({
+    sections: [
+      { id: 'one', label: 'chorus', startSeconds: 0, endSeconds: 10 },
+      { id: 'two', label: 'chorus', startSeconds: 10, endSeconds: 20 }
+    ],
+    creative: { lyrics: 'Sun in the sky\nWalking down the street\nFeeling so free\nIt\'s a good day' }
+  });
+  assert.match(goodDay[0].narrative.subject, /red headphones/);
+  assert.match(goodDay[1].narrative.setting, /rooftop overlook/);
+  assert.match(goodDay[1].prompt, /yellow windbreaker/);
+});
+
 test('builds a reusable style bible from creative intent', () => {
   const bible = buildStyleBible({ creative: { brief: 'A surreal night journey.', visualStyle: 'Neon dreamscape.' } });
   assert.equal(bible.visualThesis, 'A surreal night journey.');

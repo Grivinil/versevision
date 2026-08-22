@@ -69,6 +69,8 @@ function inferNarrativeMotifs(lines) {
   if (/\bsnail\b|\bslow\b/.test(text)) motifs.push({ name: 'delayed or awkward movement', direction: 'turn the limitation into a recurring physical performance motif' });
   if (/\btop\b|\blegendary\b|\bscary\b/.test(text)) motifs.push({ name: 'an ascent toward an unstable threshold', direction: 'increase scale and consequence without changing the protagonist’s identity' });
   if (/\bfairy\b|\bdream\b|\bmagic\b/.test(text)) motifs.push({ name: 'a surreal escape or wish image', direction: 'foreshadow it in grounded details before allowing it to break reality' });
+  if (/\bbacon\b|\bmustache\b|\bmoustache\b|\bstylist\b|\bnickel\b|\bconditioner\b|\bgrease\b/.test(text)) motifs.push({ name: 'a five-cent mustache makeover and bacon-grease reveal', direction: 'plant the cheap makeover details early, then pay them off as the comic reveal' });
+  if (/\bsun\b|\bsky\b|\bclouds?\b|\bwalking\b|\bfree\b|\bfavorite song\b|\bgood day\b/.test(text)) motifs.push({ name: 'a bright day becoming a private music-video world', direction: 'repeat ordinary places while increasing color, motion, and shared musical energy' });
   return motifs;
 }
 
@@ -77,21 +79,50 @@ function narrativeProfile({ motifs, creative }) {
     return {
       subject: 'the central subject established by the creative brief',
       setting: 'the primary world established by the creative brief',
-      anchor: 'the recurring prop or visual motif established by the brief'
+      anchor: 'the recurring prop or visual motif established by the brief',
+      wardrobe: 'the wardrobe and physical design established by the brief',
+      spatialRule: 'preserve the geography and screen direction established by the brief',
+      palette: 'the palette established by the brief'
     };
   }
   const names = new Set(motifs.map((motif) => motif.name));
   if (names.has('family or academic pressure') && names.has('a distinctive drink or handheld prop')) {
     return {
-      subject: 'a cash-strapped, restless student whose boba ritual becomes a playful escape from family and academic pressure',
-      setting: 'a connected school, home, and neighborhood world with a recognizable kitchen-table or hallway anchor',
-      anchor: 'the same boba cup, report-card imagery, and expressive student wardrobe'
+      subject: 'a perpetually late high-school student in an oversized cobalt hoodie, scuffed white sneakers, and a sticker-covered backpack',
+      setting: 'a continuous route from a cramped kitchen table, through fluorescent school corridors, to a corner boba shop and the adjacent residential block',
+      anchor: 'a clear brown-sugar boba cup with a blue straw, a red report card, and the cobalt hoodie',
+      wardrobe: 'the cobalt hoodie, scuffed white sneakers, sticker-covered backpack, and loosened school tie',
+      spatialRule: 'keep the student moving left-to-right from home toward school and the boba shop; reverse direction only when the story turns inward',
+      palette: 'cobalt blue, boba amber, fluorescent green, and report-card red'
+    };
+  }
+  if (names.has('a five-cent mustache makeover and bacon-grease reveal')) {
+    return {
+      subject: 'a scraggly, hungry man with a narrow face, unruly dark mustache, patched olive work jacket, frayed jeans, and scuffed brown boots',
+      setting: 'a sun-bleached neighborhood sidewalk leading to a one-chair mustache kiosk with a striped awning, a hand-painted five-cent sign, and a wall mirror',
+      anchor: 'the single nickel, the five-cent sign, the barber scissors, the wall mirror, and the glossy bacon-greased mustache',
+      wardrobe: 'the patched olive work jacket, frayed jeans, scuffed brown boots, and the same silhouette before and after the trim',
+      spatialRule: 'track the man left-to-right along the sidewalk, stop him at the kiosk, then hold the mirror as the visual axis for the reveal',
+      palette: 'dusty ochre, faded red-and-cream stripes, greasy amber highlights, and deep brown shadows'
+    };
+  }
+  if (names.has('a bright day becoming a private music-video world')) {
+    return {
+      subject: 'a carefree young traveler in a yellow windbreaker, red headphones, white sneakers, and a small blue daypack',
+      setting: 'a tree-lined residential block that opens into a pocket park, a pedestrian bridge, and a bright rooftop overlook',
+      anchor: 'the red headphones, yellow windbreaker, white sneakers, and the same blue daypack carried through every location',
+      wardrobe: 'the yellow windbreaker, red headphones, white sneakers, and blue daypack; never change the silhouette between sections',
+      spatialRule: 'begin at street level, widen into the park and bridge, then rise to the rooftop; keep the traveler moving toward the sun until the final return',
+      palette: 'morning blue, cloud white, warm yellow, leaf green, and a small red accent from the headphones'
     };
   }
   if (names.has('money and status anxiety')) {
     return {
       subject: 'a resourceful protagonist trying to appear more confident than their circumstances allow',
       setting: 'a connected neighborhood world where storefronts, clothing, and empty pockets reveal status',
+      wardrobe: 'the repaired jacket, worn trousers, and one aspirational accessory that remains visible in every scene',
+      spatialRule: 'move from public exposure toward a private decision, keeping the aspirational object in frame whenever status anxiety peaks',
+      palette: 'muted street neutrals with one increasingly saturated aspirational color',
       anchor: 'one conspicuous object that changes meaning as the protagonist’s fortunes shift'
     };
   }
@@ -99,13 +130,19 @@ function narrativeProfile({ motifs, creative }) {
     return {
       subject: 'a grounded protagonist tempted by an increasingly surreal escape',
       setting: 'a familiar everyday world with one consistent threshold into the impossible',
-      anchor: 'a recurring ordinary object that foreshadows the wish image'
+      anchor: 'a recurring ordinary object that foreshadows the wish image',
+      wardrobe: 'grounded everyday clothing that gains one impossible detail only after the threshold is crossed',
+      spatialRule: 'keep the ordinary world physically consistent until the threshold is crossed, then distort scale without changing the protagonist',
+      palette: 'natural everyday color with one impossible accent that grows brighter scene by scene'
     };
   }
   return {
-    subject: 'one recurring protagonist with a stable face, silhouette, wardrobe logic, and physicality',
-    setting: 'a consistent lived-in world whose geography remains legible from block to block',
-    anchor: 'a recurring prop or visual motif implied by the lyric intent'
+    subject: 'one recurring protagonist in a rust-red jacket, charcoal trousers, white shoes, and a small canvas satchel, with a stable face and silhouette',
+    setting: 'a three-part neighborhood route linking a bus stop, a corner store, and a rooftop overlook',
+    anchor: 'the canvas satchel, a chipped enamel keychain, and a red-painted wall that reappears at each location',
+    wardrobe: 'the rust-red jacket, charcoal trousers, white shoes, and canvas satchel; do not redesign the protagonist between scenes',
+    spatialRule: 'preserve the bus-stop-to-store-to-rooftop geography and the protagonist\'s screen direction unless a reversal is narratively motivated',
+    palette: 'a restrained street palette with one recurring red accent'
   };
 }
 
@@ -128,18 +165,33 @@ function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, c
   const carryForward = previous
     ? `Carry forward the prior scene’s anchor prop, wardrobe, color logic, and spatial direction; transform one of them only when the story state changes.`
     : 'Establish a repeatable wardrobe, silhouette, location anchor, and prop that later scenes can recognize immediately.';
+  const payoff = direction.role === 'visual payoff';
+  const preciseContinuity = previous
+    ? `Continue directly from ${previous.id}: ${previous.stateAfter}. Keep ${profile.subject} in ${profile.wardrobe}; preserve ${profile.anchor}, ${profile.setting}, and the rule that ${profile.spatialRule} before introducing only the section's new pressure.`
+    : `Open with an establishing image of ${profile.subject} inside ${profile.setting}; make ${profile.anchor} visible and establish that ${profile.spatialRule}.`;
+  const preciseScene = index === 0
+    ? `Place ${profile.subject} in ${profile.setting}; show ${profile.anchor} in the first readable composition and use ${profile.palette} as the baseline palette while the lyric hook "${lyricHook}" triggers the opening action.`
+    : payoff
+      ? `Return ${profile.subject} to the established ${profile.setting}; make ${profile.anchor} deliver the payoff, with ${profile.spatialRule} and ${profile.palette} visibly intensified rather than replaced.`
+      : `Move ${profile.subject} through ${profile.setting}; use ${profile.anchor} and ${profile.spatialRule} to cause or reveal the next turn, while ${motifText} changes the character's behavior rather than sitting in the background.`;
+  const preciseCarryForward = previous
+    ? `${preciseContinuity} Carry forward ${profile.wardrobe}, ${profile.anchor}, and ${profile.palette}; preserve ${profile.spatialRule}. Change only the single prop, lighting state, or blocking choice required by the new story state.`
+    : `${preciseContinuity} Establish ${profile.wardrobe}, ${profile.anchor}, ${profile.palette}, and ${profile.spatialRule} so later scenes can match the same subject and geography immediately.`;
   return {
     arcRole: direction.role,
     subject,
-    scene,
+    scene: preciseScene,
     characterAction: `${direction.action}. Use “${lyricHook}” as the immediate behavioral trigger, not as a list of text to illustrate.`,
     stateBefore: previous?.stateAfter || 'the story has not yet shown the protagonist’s want',
     stateAfter: direction.state,
     continuityFrom: previous?.id || null,
-    carryForward,
+    carryForward: preciseCarryForward,
     motifs,
     setting: profile.setting,
-    anchor: profile.anchor
+    anchor: profile.anchor,
+    wardrobe: profile.wardrobe,
+    spatialRule: profile.spatialRule,
+    palette: profile.palette
   };
 }
 
@@ -194,6 +246,7 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
     const lyricReferences = lyricReferencesFor({ section, sectionIndex: index, sections, lyrics: creative.lyrics, alignment: analysis.lyricAlignment });
     const narrative = buildNarrativeBeat({ sceneId, section, index, total: sections.length, lyricReferences, creative, previous: previousBeat, globalMotifs });
     const narrativePrompt = `Narrative continuity: ${narrative.continuityFrom ? `continue from ${narrative.continuityFrom};` : 'begin the story;'} Arc role: ${narrative.arcRole}. Subject: ${narrative.subject}. Scene: ${narrative.scene} Character action: ${narrative.characterAction} State transition: ${narrative.stateBefore} → ${narrative.stateAfter}. ${narrative.carryForward}`;
+    const narrativeSpecifics = `Wardrobe continuity: ${narrative.wardrobe}. Spatial continuity: ${narrative.spatialRule}. Palette continuity: ${narrative.palette}.`;
     const lyricCueText = lyricMoments.length
       ? `Lyric moments to honor: ${lyricMoments.map((moment) => `"${moment.text}" (${moment.startSeconds.toFixed(3)}-${moment.endSeconds.toFixed(3)}s)`).join(' | ')}.`
       : '';
@@ -212,7 +265,7 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
       lyricDirection,
       narrative,
       intent: direction.intent,
-      prompt: `${direction.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${narrativePrompt} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
+      prompt: `${direction.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${narrativePrompt} ${narrativeSpecifics} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
       negativePrompt: DEFAULT_NEGATIVE_PROMPT,
       camera: { shot: direction.camera, movement: direction.camera },
       lighting: direction.lighting,
