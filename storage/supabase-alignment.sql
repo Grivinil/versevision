@@ -26,6 +26,8 @@ create index if not exists versevision_alignment_jobs_queue_idx
 
 alter table public.versevision_alignment_jobs enable row level security;
 revoke all on table public.versevision_alignment_jobs from anon, authenticated;
+grant usage on schema public to service_role;
+grant select, insert, update, delete on table public.versevision_alignment_jobs to service_role;
 
 create or replace function public.claim_versevision_alignment_job()
 returns setof public.versevision_alignment_jobs
