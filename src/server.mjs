@@ -12,6 +12,7 @@ import { createAlignmentJobManager } from './alignment-jobs.mjs';
 import { renderStudioHtml } from './studio.mjs';
 import { VERSEVISION_LOGO_SVG, VERSEVISION_SOCIAL_SVG } from './brand.mjs';
 import { renderRobotsTxt, renderSitemapXml } from './seo.mjs';
+import { renderLandingHtml } from './landing.mjs';
 
 const JSON_BODY_LIMIT = 128 * 1024;
 const MULTIPART_BODY_LIMIT = MAX_AUDIO_BYTES + 512 * 1024;
@@ -279,7 +280,8 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
     if (request.method === 'GET' && route === '/assets/versevision-social.svg') return sendSvg(response, 200, VERSEVISION_SOCIAL_SVG);
     if (request.method === 'GET' && route === '/robots.txt') return sendRobots(response, 200, renderRobotsTxt({ publicUrl: publicOrigin(request) }));
     if (request.method === 'GET' && route === '/sitemap.xml') return sendXml(response, 200, renderSitemapXml({ publicUrl: publicOrigin(request) }));
-    if (request.method === 'GET' && (route === '/' || route === '/studio')) return sendHtml(response, 200, renderStudioHtml({ publicUrl: publicOrigin(request), pagePath: route }));
+    if (request.method === 'GET' && route === '/') return sendHtml(response, 200, renderLandingHtml({ publicUrl: publicOrigin(request) }));
+    if (request.method === 'GET' && route === '/studio') return sendHtml(response, 200, renderStudioHtml({ publicUrl: publicOrigin(request), pagePath: route }));
     if (request.method === 'GET' && route === '/health') {
       return sendJson(response, 200, { service: 'versevision', status: 'ok', stage: process.env.NODE_ENV || 'development' });
     }

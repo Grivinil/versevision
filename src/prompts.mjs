@@ -360,7 +360,9 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
   const style = creative.visualStyle || 'Cinematic, intentional visual storytelling with consistent subjects and locations.';
   const mood = Array.isArray(creative.mood) && creative.mood.length ? creative.mood.join(', ') : 'follow the emotional movement of the track';
   const genre = Array.isArray(creative.genre) && creative.genre.length ? creative.genre.join(', ') : 'music video';
-  const aspectRatio = output.aspectRatio || '16:9';
+  const framingDirection = output.aspectRatio
+    ? `Compose for ${output.aspectRatio}.`
+    : 'Keep framing production-flexible; do not lock the scene to a specific orientation.';
   const narrativeMode = creative.narrativeMode || 'song';
   const globalMotifs = inferNarrativeMotifs(providedLyricLines(creative.lyrics));
   let previousBeat = null;
@@ -398,7 +400,7 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
         lyricReferences: lyricReferences.map((reference) => reference.provenance)
       },
       intent: visualDirection.intent,
-      prompt: `${visualDirection.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. Compose for ${aspectRatio}. ${modePrompt} ${narrativePrompt} ${narrativeSpecifics} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
+      prompt: `${visualDirection.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. ${framingDirection} ${modePrompt} ${narrativePrompt} ${narrativeSpecifics} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
       negativePrompt: [DEFAULT_NEGATIVE_PROMPT, ...narrative.avoid].join(', '),
       camera: { shot: narrative.camera || visualDirection.camera, movement: narrative.camera || visualDirection.camera },
       lighting: visualDirection.lighting,

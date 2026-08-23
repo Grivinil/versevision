@@ -36,6 +36,17 @@ test('generates time-coded scene prompts from classified sections', () => {
   assert.deepEqual(scenes[0].continuityRefs, ['character_01', 'location_01', 'style_01']);
 });
 
+test('keeps framing flexible when no production aspect ratio is selected', () => {
+  const [scene] = generateScenePrompts({
+    sections: [{ id: 'verse_01', label: 'verse', startSeconds: 0, endSeconds: 8, confidence: 0.7 }],
+    analysis: {},
+    creative: { brief: 'A character waits beside a quiet road.' },
+    output: {}
+  });
+  assert.ok(scene.prompt.includes('Keep framing production-flexible'));
+  assert.ok(!scene.prompt.includes('Compose for 16:9'));
+});
+
 test('confidence-gates acoustic lyric cues before putting them in prompts', () => {
   const scenes = generateScenePrompts({
     sections: [{ id: 'verse_01', label: 'verse', startSeconds: 0, endSeconds: 8, confidence: 0.7 }],

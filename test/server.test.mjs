@@ -61,19 +61,22 @@ test('preview response exposes two narrative sample scenes when sections exist',
   assert.equal(response.samplePreviewSeconds, 16);
 });
 
-test('serves the human-facing studio page at /studio and /', async () => {
+test('serves the human-facing landing page and studio with SEO metadata', async () => {
   const server = createVerseVisionServer({ port: 0, host: '127.0.0.1' });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   try {
     const address = server.address();
-    for (const path of ['/studio', '/']) {
+    const pages = [
+      { path: '/', required: /Try a free preview/ },
+      { path: '/studio', required: /Generate free preview/ }
+    ];
+    for (const { path, required } of pages) {
       const response = await fetch(`http://127.0.0.1:${address.port}${path}`);
       const body = await response.text();
       assert.equal(response.status, 200);
       assert.match(response.headers.get('content-type'), /text\/html/);
       assert.match(body, /VerseVision/);
-      assert.match(body, /v1\/blueprint\/preview/);
-      assert.match(body, /Generate free preview/);
+      assert.match(body, required);
       assert.match(body, /rel="canonical"/);
       assert.match(body, /property="og:image"/);
       assert.match(body, /application\/ld\+json/);
