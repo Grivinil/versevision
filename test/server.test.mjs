@@ -80,10 +80,20 @@ test('serves the human-facing studio page at /studio and /', async () => {
     }
     const logo = await fetch(`http://127.0.0.1:${address.port}/assets/versevision-logo.svg`);
     const social = await fetch(`http://127.0.0.1:${address.port}/assets/versevision-social.svg`);
+    const robots = await fetch(`http://127.0.0.1:${address.port}/robots.txt`);
+    const sitemap = await fetch(`http://127.0.0.1:${address.port}/sitemap.xml`);
     assert.equal(logo.status, 200);
     assert.match(logo.headers.get('content-type'), /image\/svg\+xml/);
     assert.equal(social.status, 200);
     assert.match(social.headers.get('content-type'), /image\/svg\+xml/);
+    assert.equal(robots.status, 200);
+    assert.match(robots.headers.get('content-type'), /text\/plain/);
+    assert.match(await robots.text(), /Sitemap: http:\/\/127\.0\.0\.1/);
+    assert.equal(sitemap.status, 200);
+    assert.match(sitemap.headers.get('content-type'), /application\/xml/);
+    const sitemapBody = await sitemap.text();
+    assert.match(sitemapBody, /<loc>http:\/\/127\.0\.0\.1[^<]*<\/loc>/);
+    assert.doesNotMatch(sitemapBody, /\/v1\//);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

@@ -11,6 +11,7 @@ import { createWhisperXAligner } from './acoustic-worker.mjs';
 import { createAlignmentJobManager } from './alignment-jobs.mjs';
 import { renderStudioHtml } from './studio.mjs';
 import { VERSEVISION_LOGO_SVG, VERSEVISION_SOCIAL_SVG } from './brand.mjs';
+import { renderRobotsTxt, renderSitemapXml } from './seo.mjs';
 
 const JSON_BODY_LIMIT = 128 * 1024;
 const MULTIPART_BODY_LIMIT = MAX_AUDIO_BYTES + 512 * 1024;
@@ -34,6 +35,22 @@ function sendSvg(response, statusCode, body) {
   response.writeHead(statusCode, {
     'content-type': 'image/svg+xml; charset=utf-8',
     'cache-control': 'public, max-age=86400'
+  });
+  response.end(body);
+}
+
+function sendXml(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    'content-type': 'application/xml; charset=utf-8',
+    'cache-control': 'public, max-age=3600'
+  });
+  response.end(body);
+}
+
+function sendRobots(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    'content-type': 'text/plain; charset=utf-8',
+    'cache-control': 'public, max-age=3600'
   });
   response.end(body);
 }
@@ -260,6 +277,8 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
     const route = new URL(request.url || '/', 'http://localhost').pathname;
     if (request.method === 'GET' && route === '/assets/versevision-logo.svg') return sendSvg(response, 200, VERSEVISION_LOGO_SVG);
     if (request.method === 'GET' && route === '/assets/versevision-social.svg') return sendSvg(response, 200, VERSEVISION_SOCIAL_SVG);
+    if (request.method === 'GET' && route === '/robots.txt') return sendRobots(response, 200, renderRobotsTxt({ publicUrl: publicOrigin(request) }));
+    if (request.method === 'GET' && route === '/sitemap.xml') return sendXml(response, 200, renderSitemapXml({ publicUrl: publicOrigin(request) }));
     if (request.method === 'GET' && (route === '/' || route === '/studio')) return sendHtml(response, 200, renderStudioHtml({ publicUrl: publicOrigin(request), pagePath: route }));
     if (request.method === 'GET' && route === '/health') {
       return sendJson(response, 200, { service: 'versevision', status: 'ok', stage: process.env.NODE_ENV || 'development' });
