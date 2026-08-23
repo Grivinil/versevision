@@ -1271,6 +1271,130 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
   });
 }
 
+const SHOT_TARGET_SECONDS = { coarse: 20, standard: 8, dense: 5 };
+const SHOT_ROLE_LANGUAGE = {
+  establish: 'Establish the geography and subject in one readable composition.',
+  action: 'Show one specific character action that changes the immediate story state.',
+  detail: 'Use one focused visual detail or insert that carries the established motif.',
+  transition: 'Create one clear transition that carries the character and continuity into the next shot.',
+  payoff: 'Deliver one memorable visual payoff for this section without changing the established world.'
+};
+
+function shotTargetSeconds(granularity = 'standard') {
+  return SHOT_TARGET_SECONDS[granularity] || SHOT_TARGET_SECONDS.standard;
+}
+
+function allocateShotCounts(scenes, granularity = 'standard', maxShots = 40) {
+  if (!scenes.length) return [];
+  const targetSeconds = shotTargetSeconds(granularity);
+  const durations = scenes.map((scene) => Math.max(0.001, Number(scene.endSeconds) - Number(scene.startSeconds)));
+  const totalDuration = durations.reduce((sum, value) => sum + value, 0);
+  const desired = Math.min(maxShots, Math.max(scenes.length, Math.ceil(totalDuration / targetSeconds)));
+  const ideal = durations.map((duration) => duration / targetSeconds);
+  const counts = ideal.map((value) => Math.max(1, Math.floor(value)));
+  const rank = (index) => ideal[index] - counts[index];
+  while (counts.reduce((sum, value) => sum + value, 0) < desired) {
+    const index = counts.map((_, candidate) => candidate).sort((left, right) => rank(right) - rank(left))[0];
+    counts[index] += 1;
+  }
+  while (counts.reduce((sum, value) => sum + value, 0) > desired) {
+    const candidates = counts.map((count, index) => ({ count, index })).filter((item) => item.count > 1);
+    if (!candidates.length) break;
+    const index = candidates.sort((left, right) => rank(left.index) - rank(right.index))[0].index;
+    counts[index] -= 1;
+  }
+  return counts;
+}
+
+function shotRoleFor(scene, shotIndex, shotCount) {
+  if (shotCount === 1) return scene.narrative?.arcRole === 'visual payoff' ? 'payoff' : 'establish';
+  if (shotIndex === 0) return 'establish';
+  if (shotIndex === shotCount - 1) {
+    return ['visual payoff', 'resolution or suspended ending', 'reintegrated resolution', 'cinematic resolution'].includes(scene.narrative?.arcRole) ? 'payoff' : 'transition';
+  }
+  if (shotCount >= 4 && shotIndex === 1) return 'detail';
+  return 'action';
+}
+
+function shotCameraFor(scene, role, shotIndex) {
+  const raw = String(scene.shotLanguage || scene.narrative?.camera || scene.camera?.shot || 'single-camera coverage').trim();
+  if (scene.shotLanguage) return raw;
+  const fragments = raw.split(/\s*(?:,|;|\bthen\b|\bfollowed by\b)\s*/i).map((item) => item.trim().replace(/^(and|then)\s+/i, '')).filter(Boolean);
+  const selected = role === 'establish'
+    ? fragments[0]
+    : role === 'payoff'
+      ? fragments.at(-1)
+      : fragments[Math.min(Math.max(shotIndex, 1), fragments.length - 1)];
+  const shotType = { establish: 'wide establishing shot', action: 'medium action shot', detail: 'close insert shot', transition: 'transitional tracking shot', payoff: 'wide payoff shot' }[role] || 'single-camera shot';
+  return `${shotType} using ${selected || raw}`;
+}
+
+function lyricCueForShot(scene, shotIndex, shotCount) {
+  const cues = [...(scene.lyricMoments || []), ...(scene.lyricReferences || [])].filter((item, index, items) => item?.text && items.findIndex((candidate) => candidate.text === item.text) === index);
+  if (!cues.length) return null;
+  return cues[Math.min(cues.length - 1, Math.floor((shotIndex * cues.length) / shotCount))];
+}
+
+function listParts(value) {
+  return String(value || '').split(/\s*,\s*|\s+and\s+/i).map((item) => item.trim().replace(/^(and|then)\s+/i, '')).filter(Boolean);
+}
+
+function shotLocationFor(scene, shotIndex, shotCount) {
+  const locations = listParts(scene.narrative?.setting);
+  return locations[Math.min(locations.length - 1, Math.floor((shotIndex * locations.length) / shotCount))] || scene.narrative?.setting || 'the established setting';
+}
+
+function shotAnchorFor(scene, shotIndex, shotCount) {
+  const anchors = listParts(scene.narrative?.anchor);
+  return anchors[Math.min(anchors.length - 1, Math.floor((shotIndex * anchors.length) / shotCount))] || scene.narrative?.anchor || 'the established visual anchor';
+}
+
+export function generateShotPlan({ scenes = [], granularity = 'standard', maxShots = 40 } = {}) {
+  if (!Array.isArray(scenes) || !scenes.length) return [];
+  const counts = allocateShotCounts(scenes, granularity, maxShots);
+  let sequence = 0;
+  return scenes.flatMap((scene, sceneIndex) => {
+    const count = counts[sceneIndex] || 1;
+    const start = Number(scene.startSeconds) || 0;
+    const end = Number(scene.endSeconds) || start;
+    const duration = Math.max(0, end - start);
+    return Array.from({ length: count }, (_, shotIndex) => {
+      sequence += 1;
+      const shotStart = start + (duration * shotIndex) / count;
+      const shotEnd = shotIndex === count - 1 ? end : start + (duration * (shotIndex + 1)) / count;
+      const role = shotRoleFor(scene, shotIndex, count);
+      const camera = shotCameraFor(scene, role, shotIndex);
+      const lyricCue = lyricCueForShot(scene, shotIndex, count);
+      const narrative = scene.narrative || {};
+      const location = shotLocationFor(scene, shotIndex, count);
+      const anchor = shotAnchorFor(scene, shotIndex, count);
+      const continuity = `Continuity lock: ${narrative.subject}. Wardrobe: ${narrative.wardrobe}. Current location: ${location}. Current anchor: ${anchor}. Palette: ${narrative.palette}.`;
+      const lyricDirection = lyricCue ? `Respond visually to the lyric moment "${lyricCue.text}"; make it behavior or visible action, not on-screen text.` : 'Let the section\'s emotional turn drive one visible character action.';
+      const prompt = `${SHOT_ROLE_LANGUAGE[role]} ${continuity} In ${location}, show ${narrative.subject} interacting with ${anchor}. ${lyricDirection} Camera: ${camera}. Lighting: ${scene.lighting}. Preserve the spatial rule: ${narrative.spatialRule}. Use one continuous camera setup in this location and do not introduce a second location or character design.`.replace(/\s+/g, ' ').trim();
+      return {
+        id: `shot_${String(sequence).padStart(2, '0')}`,
+        sceneBlockId: scene.id,
+        sceneBlockIndex: sceneIndex,
+        sceneShotIndex: shotIndex + 1,
+        sceneShotCount: count,
+        sectionId: scene.sectionId,
+        sectionLabel: scene.sectionLabel,
+        startSeconds: Number(shotStart.toFixed(3)),
+        endSeconds: Number(shotEnd.toFixed(3)),
+        durationSeconds: Number((shotEnd - shotStart).toFixed(3)),
+        role,
+        prompt,
+        negativePrompt: scene.negativePrompt,
+        camera: { shot: camera, movement: camera },
+        lighting: scene.lighting,
+        lyricCue: lyricCue ? { text: lyricCue.text, source: lyricCue.source, provenance: lyricCue.provenance, timing: lyricCue.timing } : null,
+        continuityRefs: scene.continuityRefs,
+        provenance: { ...scene.provenance, shot: 'default_proposal' }
+      };
+    });
+  });
+}
+
 export function auditSceneContinuity(scenes = []) {
   if (!Array.isArray(scenes) || scenes.length === 0) {
     return { status: 'not_available', score: null, sceneCount: 0, checks: [], violations: [] };

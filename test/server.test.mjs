@@ -22,7 +22,9 @@ test('builds the preview response from analysis without inventing scene data', (
   assert.equal(response.source.title, 'Test track');
   assert.equal(response.analysisSummary.bpm.value, 120);
   assert.equal(response.analysisSummary.sectionCount, 0);
-  assert.equal(response.analysisSummary.estimatedSceneCount, 2);
+  assert.equal(response.analysisSummary.sceneBlockCount, 0);
+  assert.equal(response.analysisSummary.estimatedSceneCount, 0);
+  assert.equal(response.analysisSummary.estimatedShotCount, 2);
   assert.deepEqual(response.sampleScenes, []);
   assert.equal(response.sampleSceneCount, 0);
   assert.equal(response.warnings.length, 1);
@@ -141,7 +143,9 @@ test('preview route accepts multipart spec plus audio upload', async () => {
     assert.equal(body.schema, 'versevision/blueprint-preview/v1');
     assert.equal(body.source.title, 'Uploaded track');
     assert.equal(body.source.mimeType, 'audio/wav');
-    assert.equal(body.analysisSummary.estimatedSceneCount, 1);
+    assert.equal(body.analysisSummary.sceneBlockCount, 0);
+    assert.equal(body.analysisSummary.estimatedSceneCount, 0);
+    assert.equal(body.analysisSummary.estimatedShotCount, 1);
     assert.equal(body.analysisSummary.lyricAlignment.lineCount, 1);
     assert.equal(body.analysisSummary.lyricAlignment.sections[0].lines[0].words[0].text, 'Sun');
   } finally {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditSceneContinuity, buildStyleBible, generateScenePrompts } from '../src/prompts.mjs';
+import { auditSceneContinuity, buildStyleBible, generateScenePrompts, generateShotPlan } from '../src/prompts.mjs';
 
 test('generates time-coded scene prompts from classified sections', () => {
   const sections = [
@@ -89,6 +89,29 @@ test('selects section-specific shot language with global fallback', () => {
   assert.equal(scenes[1].camera.shot, 'motivated movement with clear geography');
   assert.equal(scenes[2].camera.shot, 'sweeping wide orbit');
   assert.ok(scenes[0].prompt.includes('Shot language for intro: locked wide, slow push-in.'));
+});
+
+test('expands scene blocks into ordered one-camera shots without timing gaps', () => {
+  const scenes = generateScenePrompts({
+    sections: [
+      { id: 'intro_01', label: 'intro', startSeconds: 0, endSeconds: 10, confidence: 0.7 },
+      { id: 'chorus_02', label: 'chorus', startSeconds: 10, endSeconds: 30, confidence: 0.7 }
+    ],
+    creative: { lyrics: 'A light appears\nThe character moves toward it.' },
+    analysis: {}
+  });
+  const shots = generateShotPlan({ scenes, granularity: 'standard' });
+  assert.equal(shots.length, 4);
+  assert.equal(shots[0].sceneBlockId, 'scene_01');
+  assert.equal(shots.at(-1).sceneBlockId, 'scene_02');
+  assert.equal(shots[0].startSeconds, 0);
+  assert.equal(shots.at(-1).endSeconds, 30);
+  shots.forEach((shot, index) => {
+    assert.ok(shot.prompt.length > 100);
+    assert.ok(shot.camera.shot.length > 0);
+    assert.ok(shot.endSeconds > shot.startSeconds);
+    if (index > 0) assert.equal(shot.startSeconds, shots[index - 1].endSeconds);
+  });
 });
 
 test('confidence-gates acoustic lyric cues before putting them in prompts', () => {

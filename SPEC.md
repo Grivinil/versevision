@@ -94,7 +94,8 @@ Both routes accept the same logical request. JSON requests use `source.kind = "u
 - `referenceUrls` accepts up to eight HTTPS image URLs.
 - `durationSeconds`, when supplied, must be an integer from 1 to 300 and cannot exceed the analyzed track duration.
 - `aspectRatio` must be one of `16:9`, `9:16`, `1:1`, or `4:5`.
-- `sceneGranularity` must be `coarse`, `standard`, or `dense`; the default is `standard`.
+- `sceneGranularity` must be `coarse`, `standard`, or `dense`; the default is `standard`. It controls ordered shot
+  density (approximately 20, 8, or 5 seconds per shot), not the number of musical scene blocks.
 - `generatorProfile` is `generic` in v0.1.
 - Unknown fields are rejected.
 - The caller must have the right to submit the audio, lyrics, and reference materials.
@@ -221,7 +222,8 @@ server and returns a WhisperX transcript without supplied lyrics; it is not adve
   "continuityAudit": {
     "status": "pass",
     "score": 100,
-    "sceneCount": 24,
+    "sceneBlockCount": 7,
+    "shotCount": 24,
     "checks": [],
     "violations": []
   },
@@ -264,14 +266,31 @@ server and returns a WhisperX transcript without supplied lyrics; it is not adve
       "continuityRefs": ["character_01", "location_city_01"]
     }
   ],
+  "sceneBlocks": "Same section-sized objects as scenes; this explicit alias names their story-architecture role.",
+  "shots": [
+    {
+      "id": "shot_01",
+      "sceneBlockId": "scene_01",
+      "sectionLabel": "intro",
+      "startSeconds": 0,
+      "endSeconds": 7.8,
+      "role": "establish",
+      "prompt": "One generator-ready camera setup with continuity, action, and lighting...",
+      "camera": { "shot": "wide establishing shot...", "movement": "wide establishing shot..." },
+      "lighting": "Cyan storefront light...",
+      "negativePrompt": "inconsistent face, extra limbs, unreadable text, logo, watermark"
+    }
+  ],
   "artifacts": {
     "markdown": "# VerseVision Blueprint\n...",
     "timingCsv": "scene_id,start_seconds,end_seconds,section_id\nscene_01,0,8.6,intro\n"
   },
   "warnings": [],
   "limits": {
-    "sceneCount": 24,
-    "maxSceneCount": 40,
+    "sceneBlockCount": 7,
+    "shotCount": 24,
+    "maxSceneBlockCount": 40,
+    "maxShotCount": 40,
     "analysisConfidenceFloor": 0.5
   }
 }
@@ -283,7 +302,11 @@ server and returns a WhisperX transcript without supplied lyrics; it is not adve
 - `bpm`, section boundaries, and energy values are observations with confidence values, not guarantees.
 - Every scene must have non-overlapping `startSeconds` and `endSeconds` within the requested duration.
 - Every scene must contain a prompt, negative prompt, edit guidance, and continuity references.
-- `artifacts.markdown` and `artifacts.timingCsv` are canonical convenience exports of the structured response.
+- `scenes`/`sceneBlocks` are section-sized story architecture. `shots` is the ordered, one-camera-setup output intended
+  for copy/paste into generators that accept one shot at a time.
+- Every scene block and shot must have non-overlapping `startSeconds` and `endSeconds` within the requested duration.
+- `artifacts.markdown`, `artifacts.shotMarkdown`, `artifacts.timingCsv`, and `artifacts.shotTimingCsv` are canonical
+  convenience exports of the structured response.
 - `artifacts.lrc` is a standard line-timed lyric track suitable for lyric-video and karaoke tools.
 - `artifacts.enhancedLrc` is an enhanced LRC track with word-level timestamps where acoustic alignment supplies them;
   lines without reliable word timing remain line-timed.
@@ -313,7 +336,10 @@ server and returns a WhisperX transcript without supplied lyrics; it is not adve
       "confidence": 0.94
     },
     "sectionCount": 7,
-    "estimatedSceneCount": 24,
+    "sceneBlockCount": 7,
+    "estimatedSceneCount": 7,
+    "estimatedShotCount": 24,
+    "shotTargetSeconds": 8,
     "estimatedDurationSeconds": 180.42,
     "lyrics": { "mode": "provided" },
     "lyricAlignment": {

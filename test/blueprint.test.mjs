@@ -20,7 +20,11 @@ test('builds a complete planning blueprint without rendering video', () => {
   assert.equal(result.schema, 'versevision/blueprint/v1');
   assert.equal(result.status, 'complete');
   assert.equal(result.scenes.length, 2);
+  assert.equal(result.sceneBlocks.length, 2);
+  assert.equal(result.shots.length, 4);
   assert.equal(result.scenes[1].sectionLabel, 'chorus');
   assert.match(result.artifacts.markdown, /Test track|VerseVision Blueprint/);
   assert.match(result.artifacts.timingCsv, /scene_id,section_label/);
+  assert.match(result.artifacts.shotMarkdown, /Ordered Shot Plan/);
+  assert.match(result.artifacts.shotTimingCsv, /shot_id,scene_block_id/);
 });

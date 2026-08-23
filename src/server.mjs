@@ -6,7 +6,7 @@ import { fetchAudioUrl } from './ingest.mjs';
 import { parseMultipartBody } from './multipart.mjs';
 import { NARRATIVE_MODES, validateBlueprintRequest } from './validation.mjs';
 import { buildBlueprintResponse } from './blueprint.mjs';
-import { generateScenePrompts } from './prompts.mjs';
+import { generateScenePrompts, generateShotPlan } from './prompts.mjs';
 import { createWhisperXAligner } from './acoustic-worker.mjs';
 import { createAlignmentJobManager } from './alignment-jobs.mjs';
 import { renderStudioHtml } from './studio.mjs';
@@ -141,10 +141,13 @@ async function analyzeRequestInput(input, uploadedAudio, { acousticAligner } = {
   return analyzeAudioBufferAsync({ buffer: fetched.buffer, mimeType: fetched.mimeType, filename, lyrics: input.creative?.lyrics, lyricsMode: input.creative?.lyricsMode, acousticAligner });
 }
 
-function estimateSceneCount(durationSeconds, granularity) {
+function shotTargetSeconds(granularity) {
+  return granularity === 'coarse' ? 20 : granularity === 'dense' ? 5 : 8;
+}
+
+function estimateShotCount(durationSeconds, granularity) {
   if (!Number.isFinite(durationSeconds)) return null;
-  const secondsPerScene = granularity === 'coarse' ? 20 : granularity === 'dense' ? 5 : 8;
-  return Math.min(40, Math.max(1, Math.ceil(durationSeconds / secondsPerScene)));
+  return Math.min(40, Math.max(1, Math.ceil(durationSeconds / shotTargetSeconds(granularity))));
 }
 
 export function buildPreviewResponse({ id, input, analysis }) {
@@ -157,6 +160,7 @@ export function buildPreviewResponse({ id, input, analysis }) {
     analysis: analysis.analysis,
     output: input.output || {}
   });
+  const shots = generateShotPlan({ scenes, granularity });
   const sampleScenes = scenes.slice(0, 2).map((scene) => ({
     id: scene.id,
     startSeconds: scene.startSeconds,
@@ -169,6 +173,7 @@ export function buildPreviewResponse({ id, input, analysis }) {
     lighting: scene.lighting,
     narrative: scene.narrative
   }));
+  const sampleShots = shots.slice(0, 3);
   return {
     schema: 'versevision/blueprint-preview/v1',
     requestId: id,
@@ -181,7 +186,10 @@ export function buildPreviewResponse({ id, input, analysis }) {
     analysisSummary: {
       bpm: analysis.analysis.bpm,
       sectionCount: sections.length,
-      estimatedSceneCount: estimateSceneCount(durationSeconds, granularity),
+      sceneBlockCount: scenes.length,
+      estimatedSceneCount: scenes.length,
+      estimatedShotCount: sections.length ? shots.length : estimateShotCount(durationSeconds, granularity),
+      shotTargetSeconds: shotTargetSeconds(granularity),
       estimatedDurationSeconds: durationSeconds,
       energySampleCount: analysis.analysis.energyCurve.length,
       confidence: analysis.analysis.confidence,
@@ -190,7 +198,10 @@ export function buildPreviewResponse({ id, input, analysis }) {
       lyricAlignment: analysis.analysis.lyricAlignment
     },
     sampleScenes,
+    sampleSceneBlocks: sampleScenes,
     sampleSceneCount: sampleScenes.length,
+    sampleShots,
+    sampleShotCount: sampleShots.length,
     samplePreviewSeconds: sampleScenes.at(-1)?.endSeconds ?? 0,
     warnings: analysis.warnings,
     next: { route: '/v1/blueprint', requiresPayment: true }
