@@ -1065,7 +1065,7 @@ function baseNarrativeProfile({ motifs, creative }) {
 function narrativeProfile({ motifs, creative }) {
   const base = baseNarrativeProfile({ motifs, creative });
   const overrides = creative?.visualOverrides;
-  if (!overrides || typeof overrides !== 'object') return { ...base, requiredProps: [], avoid: [], camera: null };
+  if (!overrides || typeof overrides !== 'object') return { ...base, requiredProps: [], avoid: [], camera: base.camera || null };
   const requiredProps = Array.isArray(overrides.requiredProps) ? overrides.requiredProps.filter(Boolean) : [];
   const avoid = Array.isArray(overrides.avoid) ? overrides.avoid.filter(Boolean) : [];
   return {
@@ -1077,7 +1077,7 @@ function narrativeProfile({ motifs, creative }) {
     ...(overrides.spatialRule ? { spatialRule: overrides.spatialRule } : {}),
     requiredProps,
     avoid,
-    camera: overrides.camera || null
+    camera: overrides.camera || base.camera || null
   };
 }
 

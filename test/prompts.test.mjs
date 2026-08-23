@@ -62,6 +62,7 @@ test('chooses a concrete seeded starter world when visual choices are blank', ()
   assert.ok(!scenes[0].narrative.subject.includes('established by the creative brief'));
   assert.ok(!scenes[0].narrative.setting.includes('established by the creative brief'));
   assert.ok(!scenes[1].prompt.includes('a recurring prop or visual motif implied by the lyric intent'));
+  assert.equal(scenes[0].camera.shot, scenes[0].narrative.camera);
   assert.equal(scenes[0].provenance.profile, 'starter_profile');
 });
 
