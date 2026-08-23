@@ -74,7 +74,16 @@ test('serves the human-facing studio page at /studio and /', async () => {
       assert.match(body, /VerseVision/);
       assert.match(body, /v1\/blueprint\/preview/);
       assert.match(body, /Generate free preview/);
+      assert.match(body, /rel="canonical"/);
+      assert.match(body, /property="og:image"/);
+      assert.match(body, /application\/ld\+json/);
     }
+    const logo = await fetch(`http://127.0.0.1:${address.port}/assets/versevision-logo.svg`);
+    const social = await fetch(`http://127.0.0.1:${address.port}/assets/versevision-social.svg`);
+    assert.equal(logo.status, 200);
+    assert.match(logo.headers.get('content-type'), /image\/svg\+xml/);
+    assert.equal(social.status, 200);
+    assert.match(social.headers.get('content-type'), /image\/svg\+xml/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

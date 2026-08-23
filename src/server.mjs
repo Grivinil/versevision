@@ -9,7 +9,8 @@ import { buildBlueprintResponse } from './blueprint.mjs';
 import { generateScenePrompts } from './prompts.mjs';
 import { createWhisperXAligner } from './acoustic-worker.mjs';
 import { createAlignmentJobManager } from './alignment-jobs.mjs';
-import { STUDIO_HTML } from './studio.mjs';
+import { renderStudioHtml } from './studio.mjs';
+import { VERSEVISION_LOGO_SVG, VERSEVISION_SOCIAL_SVG } from './brand.mjs';
 
 const JSON_BODY_LIMIT = 128 * 1024;
 const MULTIPART_BODY_LIMIT = MAX_AUDIO_BYTES + 512 * 1024;
@@ -27,6 +28,23 @@ function sendHtml(response, statusCode, body) {
     'cache-control': 'no-store'
   });
   response.end(body);
+}
+
+function sendSvg(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    'content-type': 'image/svg+xml; charset=utf-8',
+    'cache-control': 'public, max-age=86400'
+  });
+  response.end(body);
+}
+
+function publicOrigin(request) {
+  const configured = String(process.env.VERSEVISION_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  if (configured) return configured;
+  const host = request.headers.host || 'localhost:8080';
+  const local = host.startsWith('localhost') || host.startsWith('127.0.0.1') || host.startsWith('[::1]');
+  const forwarded = String(request.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+  return `${forwarded || (local ? 'http' : 'https')}://${host}`;
 }
 
 function sendText(response, statusCode, body, filename) {
@@ -240,7 +258,9 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
   }
   const server = createHttpServer(async (request, response) => {
     const route = new URL(request.url || '/', 'http://localhost').pathname;
-    if (request.method === 'GET' && (route === '/' || route === '/studio')) return sendHtml(response, 200, STUDIO_HTML);
+    if (request.method === 'GET' && route === '/assets/versevision-logo.svg') return sendSvg(response, 200, VERSEVISION_LOGO_SVG);
+    if (request.method === 'GET' && route === '/assets/versevision-social.svg') return sendSvg(response, 200, VERSEVISION_SOCIAL_SVG);
+    if (request.method === 'GET' && (route === '/' || route === '/studio')) return sendHtml(response, 200, renderStudioHtml({ publicUrl: publicOrigin(request), pagePath: route }));
     if (request.method === 'GET' && route === '/health') {
       return sendJson(response, 200, { service: 'versevision', status: 'ok', stage: process.env.NODE_ENV || 'development' });
     }

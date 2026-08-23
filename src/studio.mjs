@@ -3,7 +3,22 @@ export const STUDIO_HTML = String.raw`<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VerseVision Studio</title>
+  <meta name="description" content="__VERSEVISION_DESCRIPTION__">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="__VERSEVISION_CANONICAL__">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="VerseVision">
+  <meta property="og:title" content="__VERSEVISION_TITLE__">
+  <meta property="og:description" content="__VERSEVISION_DESCRIPTION__">
+  <meta property="og:url" content="__VERSEVISION_CANONICAL__">
+  <meta property="og:image" content="__VERSEVISION_SOCIAL_IMAGE__">
+  <meta property="og:image:alt" content="VerseVision creative planning studio">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="__VERSEVISION_TITLE__">
+  <meta name="twitter:description" content="__VERSEVISION_DESCRIPTION__">
+  <meta name="twitter:image" content="__VERSEVISION_SOCIAL_IMAGE__">
+  <title>__VERSEVISION_TITLE__</title>
+  <script type="application/ld+json">__VERSEVISION_JSONLD__</script>
   <style>
     :root{color-scheme:dark;--bg:#0b0d12;--panel:#141822;--panel2:#1a2030;--line:#293248;--text:#f4f6fb;--muted:#9da8bd;--accent:#b9f36a;--accent2:#79d7ff;--danger:#ff9a9a;--shadow:0 20px 70px #0008}
     *{box-sizing:border-box}body{margin:0;background:radial-gradient(1100px 600px at 90% -10%,#243c5c 0,#10151f 44%,var(--bg) 75%);color:var(--text);font:15px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}button,input,textarea,select{font:inherit}button{cursor:pointer}a{color:var(--accent2)}
@@ -54,3 +69,50 @@ export const STUDIO_HTML = String.raw`<!doctype html>
   </script>
 </body>
 </html>`;
+
+function escapeAttribute(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
+function safeJsonLd(value) {
+  return JSON.stringify(value).replaceAll('<', '\\u003c');
+}
+
+export function renderStudioHtml({ publicUrl, pagePath = '/studio' } = {}) {
+  const origin = String(publicUrl || '').replace(/\/+$/, '');
+  const isStudio = pagePath === '/studio';
+  const title = isStudio
+    ? 'VerseVision Studio — Time-Coded Visual Blueprints'
+    : 'VerseVision — Time-Coded Visual Blueprints for Music';
+  const description = isStudio
+    ? 'Upload music, lyrics, and creative intent to preview generator-ready visual scenes with timing, continuity, and LRC-ready alignment.'
+    : 'Turn music, lyrics, and creative intent into generator-ready visual blueprints with time-coded scenes, continuity, and LRC-ready alignment.';
+  const canonical = `${origin}${pagePath}`;
+  const jsonLd = safeJsonLd([
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: 'VerseVision',
+      url: origin,
+      logo: `${origin}/assets/versevision-logo.svg`,
+      description: 'Creative planning tools that turn music and intent into time-coded visual blueprints.'
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: 'VerseVision',
+      url: origin,
+      description
+    }
+  ]);
+  return STUDIO_HTML
+    .replaceAll('__VERSEVISION_TITLE__', escapeAttribute(title))
+    .replaceAll('__VERSEVISION_DESCRIPTION__', escapeAttribute(description))
+    .replaceAll('__VERSEVISION_CANONICAL__', escapeAttribute(canonical))
+    .replaceAll('__VERSEVISION_SOCIAL_IMAGE__', escapeAttribute(`${origin}/assets/versevision-social.svg`))
+    .replace('__VERSEVISION_JSONLD__', jsonLd);
+}
