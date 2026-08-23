@@ -47,6 +47,31 @@ test('keeps framing flexible when no production aspect ratio is selected', () =>
   assert.ok(!scene.prompt.includes('Compose for 16:9'));
 });
 
+test('selects section-specific shot language with global fallback', () => {
+  const scenes = generateScenePrompts({
+    sections: [
+      { id: 'intro_01', label: 'intro', startSeconds: 0, endSeconds: 8, confidence: 0.7 },
+      { id: 'verse_02', label: 'verse', startSeconds: 8, endSeconds: 16, confidence: 0.7 },
+      { id: 'chorus_03', label: 'chorus', startSeconds: 16, endSeconds: 24, confidence: 0.7 }
+    ],
+    creative: {
+      shotLanguage: {
+        global: 'motivated movement with clear geography',
+        sections: [
+          { section: 'intro', setup: 'locked wide, slow push-in' },
+          { section: 'chorus', setup: 'sweeping wide orbit' }
+        ]
+      }
+    },
+    analysis: {},
+    output: {}
+  });
+  assert.equal(scenes[0].camera.shot, 'locked wide, slow push-in');
+  assert.equal(scenes[1].camera.shot, 'motivated movement with clear geography');
+  assert.equal(scenes[2].camera.shot, 'sweeping wide orbit');
+  assert.ok(scenes[0].prompt.includes('Shot language for intro: locked wide, slow push-in.'));
+});
+
 test('confidence-gates acoustic lyric cues before putting them in prompts', () => {
   const scenes = generateScenePrompts({
     sections: [{ id: 'verse_01', label: 'verse', startSeconds: 0, endSeconds: 8, confidence: 0.7 }],

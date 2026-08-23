@@ -101,6 +101,37 @@ test('accepts bounded visual overrides and rejects oversized override lists', ()
   assert.ok(invalid.errors.some((error) => error.path === 'creative.visualOverrides.requiredProps'));
 });
 
+test('accepts bounded section-aware shot language and rejects duplicate labels', () => {
+  const valid = validateBlueprintRequest({
+    ...validRequest,
+    creative: {
+      ...validRequest.creative,
+      shotLanguage: {
+        global: 'motivated movement with clear geography',
+        sections: [
+          { section: 'intro', setup: 'locked wide, slow push-in' },
+          { section: 'chorus', setup: 'sweeping wide orbit' }
+        ]
+      }
+    }
+  });
+  assert.equal(valid.ok, true);
+  const invalid = validateBlueprintRequest({
+    ...validRequest,
+    creative: {
+      ...validRequest.creative,
+      shotLanguage: {
+        sections: [
+          { section: 'verse', setup: 'medium tracking' },
+          { section: 'verse', setup: 'close handheld' }
+        ]
+      }
+    }
+  });
+  assert.equal(invalid.ok, false);
+  assert.ok(invalid.errors.some((error) => error.path === 'creative.shotLanguage.sections[1].section'));
+});
+
 test('accepts supported narrative modes and rejects unknown modes', () => {
   for (const narrativeMode of ['song', 'spoken_word', 'meditation', 'cinematic_narration']) {
     assert.equal(validateBlueprintRequest({ ...validRequest, creative: { ...validRequest.creative, narrativeMode } }).ok, true);

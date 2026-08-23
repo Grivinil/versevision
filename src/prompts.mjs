@@ -13,6 +13,14 @@ function directionFor(label) {
   return SECTION_DIRECTION[label] || SECTION_DIRECTION.verse;
 }
 
+function shotLanguageFor(sectionLabel, shotLanguage) {
+  if (!shotLanguage || typeof shotLanguage !== 'object') return null;
+  const sections = Array.isArray(shotLanguage.sections) ? shotLanguage.sections : [];
+  const specific = sections.find((item) => item?.section === sectionLabel);
+  const fallback = sections.find((item) => item?.section === 'default');
+  return specific?.setup || fallback?.setup || shotLanguage.global || null;
+}
+
 function beatCues(section, beatGrid) {
   const interval = beatGrid?.intervalSeconds;
   if (!Number.isFinite(interval) || interval <= 0) return [];
@@ -373,6 +381,8 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
     const lyricMoments = lyricMomentsFor(section, analysis.lyricAlignment);
     const lyricReferences = lyricReferencesFor({ section, sectionIndex: index, sections, lyrics: creative.lyrics, alignment: analysis.lyricAlignment });
     const narrative = buildNarrativeBeat({ sceneId, section, index, total: sections.length, lyricReferences, creative, previous: previousBeat, globalMotifs, narrativeMode });
+    const shotSetup = shotLanguageFor(section.label, creative.shotLanguage);
+    const cameraDirection = shotSetup || narrative.camera || visualDirection.camera;
     const modePrompt = `Narrative mode: ${narrativeMode}. Use this mode's arc language and pacing while preserving the supplied subject, lyrics, and continuity anchors.`;
     const narrativePrompt = `Narrative continuity: ${narrative.continuityFrom ? `continue from ${narrative.continuityFrom};` : 'begin the story;'} Arc role: ${narrative.arcRole}. Subject: ${narrative.subject}. Scene: ${narrative.scene} Character action: ${narrative.characterAction} State transition: ${narrative.stateBefore} → ${narrative.stateAfter}. ${narrative.carryForward}`;
     const narrativeSpecifics = `Wardrobe continuity: ${narrative.wardrobe}. Spatial continuity: ${narrative.spatialRule}. Palette continuity: ${narrative.palette}. ${narrative.requiredProps.length ? `Required props: ${narrative.requiredProps.join(', ')}.` : ''} ${narrative.avoid.length ? `Avoid: ${narrative.avoid.join(', ')}.` : ''}`;
@@ -389,6 +399,7 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
       sectionId: section.id,
       sectionLabel: section.label,
       narrativeMode,
+      shotLanguage: shotSetup,
       beatCues: beatCues(section, analysis.beatGrid),
       lyricMoments,
       lyricReferences,
@@ -400,9 +411,9 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
         lyricReferences: lyricReferences.map((reference) => reference.provenance)
       },
       intent: visualDirection.intent,
-      prompt: `${visualDirection.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. ${framingDirection} ${modePrompt} ${narrativePrompt} ${narrativeSpecifics} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
+      prompt: `${visualDirection.intent} ${brief} Genre: ${genre}. Mood: ${mood}. Style: ${style}. ${framingDirection} ${shotSetup ? `Shot language for ${section.label}: ${shotSetup}.` : ''} ${modePrompt} ${narrativePrompt} ${narrativeSpecifics} ${lyricCueText} ${lyricDirection} Preserve the recurring subject, location logic, palette, and visual motifs from the style bible.`,
       negativePrompt: [DEFAULT_NEGATIVE_PROMPT, ...narrative.avoid].join(', '),
-      camera: { shot: narrative.camera || visualDirection.camera, movement: narrative.camera || visualDirection.camera },
+      camera: { shot: cameraDirection, movement: cameraDirection },
       lighting: visualDirection.lighting,
       edit: { cutOnBeat: section.label === 'chorus' || section.label === 'pre-chorus', transition: visualDirection.transition, lyricCueCount: lyricMoments.length, lyricReferenceCount: lyricReferences.length, lyricCuePolicy: 'confidence_gated_with_approximate_text_references' },
       continuityRefs,

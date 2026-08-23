@@ -3,6 +3,7 @@ const ASPECT_RATIOS = new Set(['16:9', '9:16', '1:1', '4:5']);
 const GRANULARITIES = new Set(['coarse', 'standard', 'dense']);
 const GENERATOR_PROFILES = new Set(['generic']);
 const NARRATIVE_MODES = new Set(['song', 'spoken_word', 'meditation', 'cinematic_narration']);
+const SHOT_SECTIONS = new Set(['default', 'intro', 'verse', 'pre-chorus', 'chorus', 'bridge', 'outro']);
 const AUDIO_MIME_TYPES = new Set(['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/x-m4a']);
 
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -69,6 +70,39 @@ function validateVisualOverrides(errors, overrides) {
   validateOverrideArray(errors, overrides.avoid, `${path}.avoid`);
 }
 
+function validateShotLanguage(errors, shotLanguage) {
+  if (shotLanguage === undefined) return;
+  const path = 'creative.shotLanguage';
+  if (!isObject(shotLanguage)) {
+    add(errors, path, 'must be an object');
+    return;
+  }
+  rejectUnknown(errors, shotLanguage, new Set(['global', 'sections']), path);
+  validateString(errors, shotLanguage.global, `${path}.global`, { maxLength: 800 });
+  if (shotLanguage.sections === undefined) return;
+  if (!Array.isArray(shotLanguage.sections) || shotLanguage.sections.length > 8) {
+    add(errors, `${path}.sections`, 'must be an array of at most 8 section setups');
+    return;
+  }
+  const seen = new Set();
+  shotLanguage.sections.forEach((item, index) => {
+    const itemPath = `${path}.sections[${index}]`;
+    if (!isObject(item)) {
+      add(errors, itemPath, 'must be an object');
+      return;
+    }
+    rejectUnknown(errors, item, new Set(['section', 'setup']), itemPath);
+    validateString(errors, item.section, `${itemPath}.section`, { maxLength: 32, required: true });
+    validateString(errors, item.setup, `${itemPath}.setup`, { maxLength: 800, required: true });
+    if (typeof item.section === 'string') {
+      const section = item.section.trim().toLowerCase();
+      if (!SHOT_SECTIONS.has(section)) add(errors, `${itemPath}.section`, 'must be default, intro, verse, pre-chorus, chorus, bridge, or outro');
+      if (seen.has(section)) add(errors, `${itemPath}.section`, 'must not repeat a section label');
+      seen.add(section);
+    }
+  });
+}
+
 function validateSource(errors, source) {
   const path = 'source';
   if (!isObject(source)) {
@@ -102,7 +136,7 @@ function validateCreative(errors, creative) {
     add(errors, path, 'must be an object');
     return;
   }
-  rejectUnknown(errors, creative, new Set(['brief', 'lyrics', 'lyricsMode', 'genre', 'mood', 'visualStyle', 'referenceUrls', 'visualOverrides', 'narrativeMode']), path);
+  rejectUnknown(errors, creative, new Set(['brief', 'lyrics', 'lyricsMode', 'genre', 'mood', 'visualStyle', 'referenceUrls', 'visualOverrides', 'shotLanguage', 'narrativeMode']), path);
   validateString(errors, creative.brief, `${path}.brief`, { maxLength: 4000 });
   validateString(errors, creative.lyrics, `${path}.lyrics`, { maxLength: 20000 });
   if (creative.lyricsMode !== undefined && !['provided', 'auto_tag'].includes(creative.lyricsMode)) add(errors, `${path}.lyricsMode`, 'must be provided or auto_tag');
@@ -112,6 +146,7 @@ function validateCreative(errors, creative) {
   validateString(errors, creative.visualStyle, `${path}.visualStyle`, { maxLength: 2000 });
   if (creative.narrativeMode !== undefined && !NARRATIVE_MODES.has(creative.narrativeMode)) add(errors, `${path}.narrativeMode`, 'must be song, spoken_word, meditation, or cinematic_narration');
   validateVisualOverrides(errors, creative.visualOverrides);
+  validateShotLanguage(errors, creative.shotLanguage);
   if (creative.referenceUrls !== undefined) {
     if (!Array.isArray(creative.referenceUrls) || creative.referenceUrls.length > 8) {
       add(errors, `${path}.referenceUrls`, 'must be an array of at most 8 HTTPS URLs');
