@@ -47,6 +47,24 @@ test('keeps framing flexible when no production aspect ratio is selected', () =>
   assert.ok(!scene.prompt.includes('Compose for 16:9'));
 });
 
+test('chooses a concrete seeded starter world when visual choices are blank', () => {
+  const scenes = generateScenePrompts({
+    sections: [
+      { id: 'intro_01', label: 'intro', startSeconds: 0, endSeconds: 12, confidence: 0.7 },
+      { id: 'verse_02', label: 'verse', startSeconds: 12, endSeconds: 24, confidence: 0.7 }
+    ],
+    creative: { lyrics: 'Smooth baby oil\nGlide on glide on through the fabric\nSo clean brightened sheen' },
+    output: {}
+  });
+  assert.ok(scenes[0].narrative.profileId);
+  assert.equal(scenes[0].narrative.profileId, scenes[1].narrative.profileId);
+  assert.ok(scenes[0].narrative.profileLabel);
+  assert.ok(!scenes[0].narrative.subject.includes('established by the creative brief'));
+  assert.ok(!scenes[0].narrative.setting.includes('established by the creative brief'));
+  assert.ok(!scenes[1].prompt.includes('a recurring prop or visual motif implied by the lyric intent'));
+  assert.equal(scenes[0].provenance.profile, 'starter_profile');
+});
+
 test('selects section-specific shot language with global fallback', () => {
   const scenes = generateScenePrompts({
     sections: [

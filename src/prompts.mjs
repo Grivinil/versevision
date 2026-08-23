@@ -137,6 +137,97 @@ function inferNarrativeMotifs(lines) {
   return motifs;
 }
 
+// When a user supplies audio/lyrics but leaves the visual choices blank, a
+// concrete starter world is more useful than asking a downstream generator to
+// invent every continuity anchor. These profiles are deliberately broad enough
+// to fit many songs, but specific enough to produce immediately usable shots.
+// Selection is seeded from the request so a preview and its paid blueprint keep
+// the same world while different tracks naturally receive different starters.
+const STARTER_PROFILES = [
+  {
+    id: 'neon_boardwalk_courier',
+    label: 'Neon boardwalk courier',
+    subject: 'a silver-jacketed night courier with a compact cassette player clipped to their belt',
+    setting: 'a rain-slick neon boardwalk that connects a convenience store, an arcade entrance, and a rooftop overlooking the water',
+    anchor: 'the translucent cassette player, a magenta delivery envelope, and the courier\'s reflective silver jacket',
+    wardrobe: 'the reflective silver jacket, violet sneakers, black cargo trousers, and the same cassette player at the belt in every scene',
+    spatialRule: 'move left-to-right along the boardwalk toward the water, reversing only when the courier chooses to deliver the envelope',
+    palette: 'electric cyan, hot magenta, violet shadow, and small pools of sodium amber',
+    camera: 'low tracking wides that rise into intimate shoulder-level coverage at each handoff'
+  },
+  {
+    id: 'sunset_rooftop_runner',
+    label: 'Sunset rooftop runner',
+    subject: 'a determined young runner in a coral windbreaker carrying a single paper map marked with hand-drawn stars',
+    setting: 'a connected city route from a laundromat, through a pedestrian overpass, to a water-tank rooftop at sunset',
+    anchor: 'the folded paper map, a loose red thread tied to its corner, and the coral windbreaker',
+    wardrobe: 'the coral windbreaker, cream T-shirt, charcoal running pants, and white trainers; keep the silhouette unchanged throughout',
+    spatialRule: 'start at street level and climb through the overpass toward the rooftop, keeping the runner moving toward the lowering sun',
+    palette: 'peach sunset, cobalt sky, washed concrete, and a red-thread accent',
+    camera: 'handheld lateral tracking in the route, then a wide crane reveal when the runner reaches the roof'
+  },
+  {
+    id: 'candy_diner_duo',
+    label: 'Candy-colored diner duo',
+    subject: 'two friends in coordinated mint and cherry jackets sharing a chrome portable radio',
+    setting: 'a pastel roadside diner, its fluorescent parking lot, and the quiet service road beyond it',
+    anchor: 'the chrome radio, a paper cup with a striped straw, and the checkerboard diner floor',
+    wardrobe: 'one mint jacket and one cherry-red jacket over simple white tops; preserve the color pairing and hairstyles in every scene',
+    spatialRule: 'keep the friends together from booth to parking lot, separating them only at the emotional turn before bringing them back into the same frame',
+    palette: 'bubblegum pink, mint, cream, chrome highlights, and midnight blue outside the diner',
+    camera: 'symmetrical locked frames for connection, followed by a gentle orbit when the radio changes the mood'
+  },
+  {
+    id: 'desert_radio_mechanic',
+    label: 'Desert radio mechanic',
+    subject: 'a resourceful radio mechanic in a rust-orange jumpsuit carrying a hand-built antenna',
+    setting: 'a sunlit desert service station linked to an abandoned motel and a ridge with a clear horizon',
+    anchor: 'the hand-built antenna, a dusty portable radio, and the station\'s turquoise service door',
+    wardrobe: 'the rust-orange jumpsuit, canvas work boots, protective goggles pushed onto the head, and a turquoise work glove',
+    spatialRule: 'travel from the station toward the motel and finally up the ridge, keeping the horizon as the directional axis',
+    palette: 'sun-bleached sand, turquoise paint, rust orange, and long cobalt shadows',
+    camera: 'patient wides for the landscape with close mechanical inserts whenever the signal changes'
+  },
+  {
+    id: 'paper_planet_dreamer',
+    label: 'Paper planet dreamer',
+    subject: 'a curious child-sized traveler in a navy coat carrying a folded paper planet',
+    setting: 'an ordinary apartment hallway that opens into a paper-built city, then a moonlit rooftop',
+    anchor: 'the folded paper planet, a brass key, and one paper doorway that remains in every world',
+    wardrobe: 'the navy coat, mustard scarf, red rain boots, and the same brass key on a cord',
+    spatialRule: 'follow the traveler forward through one doorway at a time; distort scale after each threshold but never change the traveler\'s silhouette',
+    palette: 'ink navy, paper cream, mustard, vermilion, and moonlit lavender',
+    camera: 'gentle dolly moves through the ordinary world that become floating overhead views after each threshold'
+  },
+  {
+    id: 'midnight_grocery_dance',
+    label: 'Midnight grocery dance',
+    subject: 'a tired night-shift clerk in a teal apron who discovers a private dance in the empty aisles',
+    setting: 'a twenty-four-hour grocery store moving from fluorescent aisles to the loading dock and a dawn bus stop',
+    anchor: 'a rolling shopping basket, a blinking aisle sign, and the teal apron',
+    wardrobe: 'the teal apron over a charcoal shirt, comfortable black shoes, and a yellow name tag that remains readable but never changes',
+    spatialRule: 'move aisle by aisle toward the loading dock, then carry the same forward motion into the dawn bus stop',
+    palette: 'fluorescent lime, teal, ripe orange packaging, wet asphalt blue, and dawn peach',
+    camera: 'precise aisle vanishing points that loosen into buoyant circular movement once the dance begins'
+  }
+];
+
+function stableProfileIndex(creative = {}) {
+  const seed = [creative.lyrics, creative.visualStyle, creative.narrativeMode, creative.genre, creative.mood]
+    .map((value) => Array.isArray(value) ? value.join('|') : String(value || ''))
+    .join('::');
+  let hash = 2166136261;
+  for (const character of seed) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash) % STARTER_PROFILES.length;
+}
+
+function starterProfileFor(creative = {}) {
+  return STARTER_PROFILES[stableProfileIndex(creative)];
+}
+
 function baseNarrativeProfile({ motifs, creative }) {
   if (creative.brief) {
     return {
@@ -209,14 +300,7 @@ function baseNarrativeProfile({ motifs, creative }) {
       palette: 'natural everyday color with one impossible accent that grows brighter scene by scene'
     };
   }
-  return {
-    subject: 'one recurring protagonist in a rust-red jacket, charcoal trousers, white shoes, and a small canvas satchel, with a stable face and silhouette',
-    setting: 'a three-part neighborhood route linking a bus stop, a corner store, and a rooftop overlook',
-    anchor: 'the canvas satchel, a chipped enamel keychain, and a red-painted wall that reappears at each location',
-    wardrobe: 'the rust-red jacket, charcoal trousers, white shoes, and canvas satchel; do not redesign the protagonist between scenes',
-    spatialRule: 'preserve the bus-stop-to-store-to-rooftop geography and the protagonist\'s screen direction unless a reversal is narratively motivated',
-    palette: 'a restrained street palette with one recurring red accent'
-  };
+  return starterProfileFor(creative);
 }
 
 function narrativeProfile({ motifs, creative }) {
@@ -274,7 +358,7 @@ function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, c
   const profile = narrativeProfile({ motifs: globalMotifs?.length ? globalMotifs : motifs, creative });
   const provenance = profileProvenance({ creative, globalMotifs: globalMotifs?.length ? globalMotifs : motifs });
   const subject = profile.subject;
-  const motifText = motifs.length ? motifs.map((motif) => motif.name).join(', ') : 'a recurring prop or visual motif implied by the lyric intent';
+  const motifText = motifs.length ? motifs.map((motif) => motif.name).join(', ') : profile.anchor;
   const lyricHook = lyricLines.length ? lyricLines.slice(0, 3).join(' / ') : 'the section’s emotional turn';
   const continuity = previous
     ? `Continue directly from ${previous.id}: ${previous.stateAfter}. Keep the same protagonist, wardrobe logic, geography, and established motifs before introducing only the section’s new pressure.`
@@ -316,11 +400,15 @@ function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, c
     wardrobe: profile.wardrobe,
     spatialRule: profile.spatialRule,
     palette: profile.palette,
+    profileId: profile.id || null,
+    profileLabel: profile.label || null,
     requiredProps: profile.requiredProps,
     avoid: profile.avoid,
     camera: profile.camera,
     provenance: {
       ...provenance,
+      profile: profile.id ? 'starter_profile' : (globalMotifs?.length ? 'lyric_inferred' : (creative.brief ? 'creative_brief' : 'default_proposal')),
+      profileId: profile.id || null,
       lyricHooks: lyricLines.length ? 'user_supplied' : 'default_proposal',
       narrativeMode: creative.narrativeMode ? 'user_supplied' : 'default_proposal'
     }
