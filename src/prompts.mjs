@@ -1,4 +1,4 @@
-const DEFAULT_NEGATIVE_PROMPT = 'inconsistent face, identity drift, extra limbs, unreadable text, logo, watermark, accidental subtitles';
+const DEFAULT_NEGATIVE_PROMPT = 'inconsistent face, identity drift, extra limbs, unreadable text, logo, watermark, no written lyrics, no on-screen lyrics, no lyric subtitles, no captions, no text overlays';
 
 const SECTION_DIRECTION = {
   intro: { intent: 'Establish the world, visual thesis, and recurring subject before the main vocal statement.', camera: 'wide establishing shot with a slow push-in', lighting: 'restrained atmosphere that introduces the palette', transition: 'fade-in' },
@@ -1335,6 +1335,13 @@ function lyricCueForShot(scene, shotIndex, shotCount) {
   return cues[Math.min(cues.length - 1, Math.floor((shotIndex * cues.length) / shotCount))];
 }
 
+// Lyric lines are references for visual direction, not title cards. Keep the
+// prompt text free of quote wrappers because some generators interpret quoted
+// phrases as text that should be rendered on screen.
+function promptSafeLyricText(value) {
+  return String(value || '').replace(/[\u0022\u201c\u201d]/g, '').replace(/\s+/g, ' ').trim();
+}
+
 function listParts(value) {
   return String(value || '').split(/\s*,\s*|\s+and\s+/i).map((item) => item.trim().replace(/^(and|then)\s+/i, '')).filter(Boolean);
 }
@@ -1369,7 +1376,8 @@ export function generateShotPlan({ scenes = [], granularity = 'standard', maxSho
       const location = shotLocationFor(scene, shotIndex, count);
       const anchor = shotAnchorFor(scene, shotIndex, count);
       const continuity = `Continuity lock: ${narrative.subject}. Wardrobe: ${narrative.wardrobe}. Current location: ${location}. Current anchor: ${anchor}. Palette: ${narrative.palette}.`;
-      const lyricDirection = lyricCue ? `Respond visually to the lyric moment "${lyricCue.text}"; make it behavior or visible action, not on-screen text.` : 'Let the section\'s emotional turn drive one visible character action.';
+      const lyricText = lyricCue ? promptSafeLyricText(lyricCue.text) : '';
+      const lyricDirection = lyricText ? `Respond visually to the lyric moment: ${lyricText}; make it behavior or visible action, not on-screen text.` : 'Let the section\'s emotional turn drive one visible character action.';
       const prompt = `${SHOT_ROLE_LANGUAGE[role]} ${continuity} In ${location}, show ${narrative.subject} interacting with ${anchor}. ${lyricDirection} Camera: ${camera}. Lighting: ${scene.lighting}. Preserve the spatial rule: ${narrative.spatialRule}. Use one continuous camera setup in this location and do not introduce a second location or character design.`.replace(/\s+/g, ' ').trim();
       return {
         id: `shot_${String(sequence).padStart(2, '0')}`,

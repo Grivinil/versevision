@@ -7,6 +7,7 @@ function markdownForBlueprint({ scenes, shots, styleBible }) {
     lines.push(`### ${scene.id} · ${scene.sectionLabel} · ${scene.startSeconds}s–${scene.endSeconds}s`);
     lines.push(`Intent: ${scene.intent}`);
     lines.push(`Prompt: ${scene.prompt}`);
+    lines.push(`Negative prompt: ${scene.negativePrompt}`);
     lines.push(`Camera: ${scene.camera.shot}`);
     lines.push(`Lighting: ${scene.lighting}`);
     lines.push('');
@@ -16,6 +17,7 @@ function markdownForBlueprint({ scenes, shots, styleBible }) {
     lines.push(`### ${shot.id} · ${shot.startSeconds}s–${shot.endSeconds}s · ${shot.sectionLabel}`);
     lines.push(`Role: ${shot.role}`);
     lines.push(`Prompt: ${shot.prompt}`);
+    lines.push(`Negative prompt: ${shot.negativePrompt}`);
     lines.push(`Camera: ${shot.camera.shot}`);
     lines.push(`Lighting: ${shot.lighting}`);
     lines.push('');
@@ -29,6 +31,7 @@ function markdownForShots(shots = []) {
     lines.push(`## ${shot.id} · ${shot.startSeconds}s–${shot.endSeconds}s · ${shot.sectionLabel}`);
     lines.push(`Role: ${shot.role}`);
     lines.push(shot.prompt);
+    lines.push(`Negative prompt: ${shot.negativePrompt}`);
     lines.push('');
   });
   return lines.join('\n');

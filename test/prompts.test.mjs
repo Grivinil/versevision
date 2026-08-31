@@ -114,6 +114,20 @@ test('expands scene blocks into ordered one-camera shots without timing gaps', (
   });
 });
 
+test('keeps lyric references out of quotation marks and carries a no-written-lyrics guard', () => {
+  const scenes = generateScenePrompts({
+    sections: [{ id: 'verse_01', label: 'verse', startSeconds: 0, endSeconds: 8, confidence: 0.7 }],
+    creative: { lyrics: 'A line with "quoted" words' },
+    analysis: {}
+  });
+  const shots = generateShotPlan({ scenes, granularity: 'standard' });
+  assert.equal(shots.length, 1);
+  assert.doesNotMatch(shots[0].prompt, /[\u0022\u201c\u201d]/);
+  assert.match(shots[0].prompt, /Respond visually to the lyric moment:/);
+  assert.match(shots[0].negativePrompt, /no written lyrics/);
+  assert.match(shots[0].negativePrompt, /no on-screen lyrics/);
+});
+
 test('confidence-gates acoustic lyric cues before putting them in prompts', () => {
   const scenes = generateScenePrompts({
     sections: [{ id: 'verse_01', label: 'verse', startSeconds: 0, endSeconds: 8, confidence: 0.7 }],
