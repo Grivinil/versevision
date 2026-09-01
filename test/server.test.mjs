@@ -70,15 +70,16 @@ test('serves the human-facing landing page and studio with SEO metadata', async 
     const address = server.address();
     const pages = [
       { path: '/', required: /Try a free preview/ },
-      { path: '/studio', required: /Generate free preview/ }
+      { path: '/studio', required: /Generate free preview/, also: /Reset for new song/ }
     ];
-    for (const { path, required } of pages) {
+    for (const { path, required, also } of pages) {
       const response = await fetch(`http://127.0.0.1:${address.port}${path}`);
       const body = await response.text();
       assert.equal(response.status, 200);
       assert.match(response.headers.get('content-type'), /text\/html/);
       assert.match(body, /VerseVision/);
       assert.match(body, required);
+      if (also) assert.match(body, also);
       assert.match(body, /rel="canonical"/);
       assert.match(body, /property="og:image"/);
       assert.match(body, /application\/ld\+json/);
