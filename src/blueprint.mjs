@@ -6,6 +6,15 @@ function markdownForBlueprint({ scenes, shots, styleBible }) {
   scenes.forEach((scene) => {
     lines.push(`### ${scene.id} · ${scene.sectionLabel} · ${scene.startSeconds}s–${scene.endSeconds}s`);
     lines.push(`Intent: ${scene.intent}`);
+    if (scene.narrative) {
+      lines.push(`Narrative arc: ${scene.narrative.arcRole}`);
+      lines.push(`Narrative subject: ${scene.narrative.subject}`);
+      lines.push(`Scene narrative: ${scene.narrative.scene}`);
+      lines.push(`Character action: ${scene.narrative.characterAction}`);
+      lines.push(`State transition: ${scene.narrative.stateBefore} → ${scene.narrative.stateAfter}`);
+      lines.push(`Continuity: ${scene.narrative.carryForward}`);
+    }
+    if (scene.lyricDirection) lines.push(scene.lyricDirection);
     lines.push(`Prompt: ${scene.prompt}`);
     lines.push(`Negative prompt: ${scene.negativePrompt}`);
     lines.push(`Camera: ${scene.camera.shot}`);

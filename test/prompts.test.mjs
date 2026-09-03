@@ -128,6 +128,25 @@ test('keeps lyric references out of quotation marks and carries a no-written-lyr
   assert.match(shots[0].negativePrompt, /no on-screen lyrics/);
 });
 
+test('preserves lyric-driven scene narrative while removing quote wrappers from generator prose', () => {
+  const scenes = generateScenePrompts({
+    sections: [{ id: 'verse_01', label: 'verse', startSeconds: 0, endSeconds: 8, confidence: 0.7 }],
+    creative: { lyrics: 'A line with "quoted" words' },
+    analysis: {}
+  });
+  const [scene] = scenes;
+  assert.equal(scene.lyricReferences[0].text, 'A line with "quoted" words');
+  assert.match(scene.narrative.scene, /A line with quoted words/);
+  assert.match(scene.narrative.characterAction, /A line with quoted words/);
+  assert.match(scene.lyricDirection, /A line with quoted words/);
+  assert.match(scene.prompt, /A line with quoted words/);
+  assert.doesNotMatch(scene.narrative.scene, /["“”]/);
+  assert.doesNotMatch(scene.narrative.characterAction, /["“”]/);
+  assert.doesNotMatch(scene.lyricDirection, /["“”]/);
+  assert.doesNotMatch(scene.prompt, /["“”]/);
+  assert.match(scene.negativePrompt, /no written lyrics/);
+});
+
 test('confidence-gates acoustic lyric cues before putting them in prompts', () => {
   const scenes = generateScenePrompts({
     sections: [{ id: 'verse_01', label: 'verse', startSeconds: 0, endSeconds: 8, confidence: 0.7 }],

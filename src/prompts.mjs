@@ -1112,7 +1112,11 @@ function lyricProvenance(line) {
 
 function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, creative, previous, globalMotifs, narrativeMode = 'song' }) {
   const direction = narrativeDirectionFor(section.label, index, total, narrativeMode);
-  const lyricLines = lyricReferences.map((line) => line.text).filter(Boolean);
+  // Keep supplied lyric meaning in the narrative, but remove quote wrappers
+  // before it reaches generator-facing prose. Quoted phrases are frequently
+  // interpreted as text to render, which previously made the lyric-driven
+  // narrative appear to disappear in downstream generators.
+  const lyricLines = lyricReferences.map((line) => promptSafeLyricText(line.text)).filter(Boolean);
   const motifs = inferNarrativeMotifs(lyricLines);
   const profile = narrativeProfile({ motifs: globalMotifs?.length ? globalMotifs : motifs, creative });
   const provenance = profileProvenance({ creative, globalMotifs: globalMotifs?.length ? globalMotifs : motifs });
@@ -1123,7 +1127,7 @@ function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, c
     ? `Continue directly from ${previous.id}: ${previous.stateAfter}. Keep the same protagonist, wardrobe logic, geography, and established motifs before introducing only the section’s new pressure.`
     : 'Open with an establishing image that makes the protagonist, world, and central want legible before expanding the visual scale.';
   const scene = index === 0
-    ? `Place the protagonist in ${profile.setting}; establish ${profile.anchor} and make the environment express the tension in “${lyricHook}”.`
+    ? `Place the protagonist in ${profile.setting}; establish ${profile.anchor} and make the environment express the tension in ${lyricHook}.`
     : section.label === 'chorus'
       ? `Return to ${profile.setting}; let ${motifText} deliver the visual payoff rather than appearing as decoration, while ${profile.anchor} remains recognizable.`
       : `Move the protagonist through ${profile.setting}; let ${motifText} cause or reveal the next turn rather than appearing as decoration, while ${profile.anchor} remains recognizable.`;
@@ -1137,7 +1141,7 @@ function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, c
     ? `Continue directly from ${previous.id}: ${previous.stateAfter}. Keep ${profile.subject} in ${profile.wardrobe}; preserve ${profile.anchor}, ${profile.setting}, and the rule that ${profile.spatialRule} before introducing only the section's new pressure.`
     : `Open with an establishing image of ${profile.subject} inside ${profile.setting}; make ${profile.anchor} visible and establish that ${profile.spatialRule}.`;
   const preciseScene = index === 0
-    ? `Place ${profile.subject} in ${profile.setting}; show ${profile.anchor} in the first readable composition and use ${profile.palette} as the baseline palette while the lyric hook "${lyricHook}" triggers the opening action.${requiredPropsText}${avoidText}`
+    ? `Place ${profile.subject} in ${profile.setting}; show ${profile.anchor} in the first readable composition and use ${profile.palette} as the baseline palette while the lyric hook ${lyricHook} triggers the opening action.${requiredPropsText}${avoidText}`
     : payoff
       ? `Return ${profile.subject} to the established ${profile.setting}; make ${profile.anchor} deliver the payoff, with ${profile.spatialRule} and ${profile.palette} visibly intensified rather than replaced.${requiredPropsText}${avoidText}`
       : `Move ${profile.subject} through ${profile.setting}; use ${profile.anchor} and ${profile.spatialRule} to cause or reveal the next turn, while ${motifText} changes the character's behavior rather than sitting in the background.${requiredPropsText}${avoidText}`;
@@ -1148,7 +1152,7 @@ function buildNarrativeBeat({ sceneId, section, index, total, lyricReferences, c
     arcRole: direction.role,
     subject,
     scene: preciseScene,
-    characterAction: `${direction.action}. Use “${lyricHook}” as the immediate behavioral trigger, not as a list of text to illustrate.`,
+    characterAction: `${direction.action}. Use ${lyricHook} as the immediate behavioral trigger, not as a list of text to illustrate.`,
     stateBefore: previous?.stateAfter || 'the story has not yet shown the protagonist’s want',
     stateAfter: direction.state,
     continuityFrom: previous?.id || null,
@@ -1234,10 +1238,10 @@ export function generateScenePrompts({ sections = [], creative = {}, analysis = 
     const narrativePrompt = `Narrative continuity: ${narrative.continuityFrom ? `continue from ${narrative.continuityFrom};` : 'begin the story;'} Arc role: ${narrative.arcRole}. Subject: ${narrative.subject}. Scene: ${narrative.scene} Character action: ${narrative.characterAction} State transition: ${narrative.stateBefore} → ${narrative.stateAfter}. ${narrative.carryForward}`;
     const narrativeSpecifics = `Wardrobe continuity: ${narrative.wardrobe}. Spatial continuity: ${narrative.spatialRule}. Palette continuity: ${narrative.palette}. ${narrative.requiredProps.length ? `Required props: ${narrative.requiredProps.join(', ')}.` : ''} ${narrative.avoid.length ? `Avoid: ${narrative.avoid.join(', ')}.` : ''}`;
     const lyricCueText = lyricMoments.length
-      ? `Lyric moments to honor: ${lyricMoments.map((moment) => `"${moment.text}" (${moment.startSeconds.toFixed(3)}-${moment.endSeconds.toFixed(3)}s)`).join(' | ')}.`
+      ? `Lyric moments to honor: ${lyricMoments.map((moment) => `${promptSafeLyricText(moment.text)} (${moment.startSeconds.toFixed(3)}-${moment.endSeconds.toFixed(3)}s)`).join(' | ')}.`
       : '';
     const lyricDirection = lyricReferences.length
-      ? `Lyric-driven visual direction: translate these supplied lines into visible action, props, and character behavior: ${lyricReferences.map((line) => `"${line.text}"`).join(' | ')}. Use acoustically aligned timing where marked; otherwise treat the lyric window as approximate and preserve narrative order.`
+      ? `Lyric-driven visual direction: translate these supplied lines into visible action, props, and character behavior: ${lyricReferences.map((line) => promptSafeLyricText(line.text)).filter(Boolean).join(' | ')}. Use acoustically aligned timing where marked; otherwise treat the lyric window as approximate and preserve narrative order.`
       : '';
     const scene = {
       id: sceneId,
