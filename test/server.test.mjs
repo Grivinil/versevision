@@ -61,6 +61,8 @@ test('preview response exposes two narrative sample scenes when sections exist',
   assert.equal(response.sampleScenes[0].narrative.arcRole, 'grounding preparation');
   assert.equal(response.sampleScenes[1].narrative.continuityFrom, response.sampleScenes[0].id);
   assert.equal(response.samplePreviewSeconds, 16);
+  assert.match(response.kissPrompt, /^K\.I\.S\.S\.:/);
+  assert.match(response.kissPrompt, /Breathe in Breathe out/);
 });
 
 test('serves the human-facing landing page and studio with SEO metadata', async () => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditSceneContinuity, buildStyleBible, generateScenePrompts, generateShotPlan } from '../src/prompts.mjs';
+import { auditSceneContinuity, buildKissPrompt, buildStyleBible, generateScenePrompts, generateShotPlan } from '../src/prompts.mjs';
 
 test('generates time-coded scene prompts from classified sections', () => {
   const sections = [
@@ -145,6 +145,23 @@ test('preserves lyric-driven scene narrative while removing quote wrappers from 
   assert.doesNotMatch(scene.lyricDirection, /["“”]/);
   assert.doesNotMatch(scene.prompt, /["“”]/);
   assert.match(scene.negativePrompt, /no written lyrics/);
+});
+
+test('builds a compact K.I.S.S. narrative prompt without lyric inserts or timing metadata', () => {
+  const prompt = buildKissPrompt({
+    creative: {
+      lyrics: '[00:12.34] [Verse 1] The river opens wide\nThen I find my way home',
+      brief: 'A solitary traveler chooses connection over escape.'
+    }
+  });
+  assert.match(prompt, /^K\.I\.S\.S\.:/);
+  assert.match(prompt, /The river opens wide Then I find my way home/);
+  assert.match(prompt, /concrete desire, an obstacle, a turning point, and a changed ending/);
+  assert.match(prompt, /solitary traveler chooses connection over escape/);
+  assert.doesNotMatch(prompt, /\[00:12\.34\]|\[Verse 1\]/);
+  assert.doesNotMatch(prompt, /[\u0022\u201c\u201d]/);
+  assert.doesNotMatch(prompt, /negative prompt/i);
+  assert.doesNotMatch(prompt, /\b\d{1,2}:\d{2}(?:[.:]\d{1,3})?\b/);
 });
 
 test('confidence-gates acoustic lyric cues before putting them in prompts', () => {

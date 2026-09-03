@@ -6,7 +6,7 @@ import { fetchAudioUrl } from './ingest.mjs';
 import { parseMultipartBody } from './multipart.mjs';
 import { NARRATIVE_MODES, validateBlueprintRequest } from './validation.mjs';
 import { buildBlueprintResponse } from './blueprint.mjs';
-import { generateScenePrompts, generateShotPlan } from './prompts.mjs';
+import { buildKissPrompt, generateScenePrompts, generateShotPlan } from './prompts.mjs';
 import { createWhisperXAligner } from './acoustic-worker.mjs';
 import { createAlignmentJobManager } from './alignment-jobs.mjs';
 import { renderStudioHtml } from './studio.mjs';
@@ -203,6 +203,7 @@ export function buildPreviewResponse({ id, input, analysis }) {
     sampleShots,
     sampleShotCount: sampleShots.length,
     samplePreviewSeconds: sampleScenes.at(-1)?.endSeconds ?? 0,
+    kissPrompt: buildKissPrompt({ creative: input.creative }),
     warnings: analysis.warnings,
     next: { route: '/v1/blueprint', requiresPayment: true }
   };
@@ -316,6 +317,7 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
         alignment: { backend: acousticAligner ? 'acoustic_forced' : 'meter_estimate', optional: true, jobStore: alignmentJobs.kind },
         limits: { maxAudioBytes: 25 * 1024 * 1024, maxAudioSeconds: 300, maxReferenceUrls: 8 },
         artifacts: {
+          kissPrompt: 'compact lyric-to-narrative prompt',
           lyricFormats: ['lrc', 'enhanced_lrc'],
           enhancedWordTiming: Boolean(acousticAligner),
           downloads: {

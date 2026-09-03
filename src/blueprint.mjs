@@ -1,8 +1,8 @@
-import { auditSceneContinuity, buildStyleBible, generateScenePrompts, generateShotPlan } from './prompts.mjs';
+import { auditSceneContinuity, buildKissPrompt, buildStyleBible, generateScenePrompts, generateShotPlan } from './prompts.mjs';
 import { buildLyricArtifacts } from './lrc.mjs';
 
-function markdownForBlueprint({ scenes, shots, styleBible }) {
-  const lines = ['# VerseVision Blueprint', '', `Visual thesis: ${styleBible.visualThesis}`, '', '## Scenes', ''];
+function markdownForBlueprint({ scenes, shots, styleBible, kissPrompt }) {
+  const lines = ['# VerseVision Blueprint', '', `Visual thesis: ${styleBible.visualThesis}`, '', '## K.I.S.S. prompt', '', kissPrompt, '', '## Scenes', ''];
   scenes.forEach((scene) => {
     lines.push(`### ${scene.id} · ${scene.sectionLabel} · ${scene.startSeconds}s–${scene.endSeconds}s`);
     lines.push(`Intent: ${scene.intent}`);
@@ -68,6 +68,7 @@ export function buildBlueprintResponse({ id, input, analysis, createdAt = new Da
     durationSeconds: analysis.source.durationSeconds,
     title: input.source.title
   });
+  const kissPrompt = buildKissPrompt({ creative: input.creative });
   return {
     schema: 'versevision/blueprint/v1',
     requestId: id,
@@ -80,7 +81,8 @@ export function buildBlueprintResponse({ id, input, analysis, createdAt = new Da
     sceneBlocks: scenes,
     shots,
     continuityAudit: auditSceneContinuity(scenes),
-    artifacts: { markdown: markdownForBlueprint({ scenes, shots, styleBible }), shotMarkdown: markdownForShots(shots), timingCsv: timingCsvForScenes(scenes), shotTimingCsv: timingCsvForShots(shots), ...lyricArtifacts },
+    kissPrompt,
+    artifacts: { markdown: markdownForBlueprint({ scenes, shots, styleBible, kissPrompt }), shotMarkdown: markdownForShots(shots), timingCsv: timingCsvForScenes(scenes), shotTimingCsv: timingCsvForShots(shots), kissPrompt, ...lyricArtifacts },
     warnings: analysis.warnings,
     limits: { sceneBlockCount: scenes.length, shotCount: shots.length, maxSceneBlockCount: 40, maxShotCount: 40 }
   };

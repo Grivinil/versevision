@@ -1346,6 +1346,22 @@ function promptSafeLyricText(value) {
   return String(value || '').replace(/[\u0022\u201c\u201d]/g, '').replace(/\s+/g, ' ').trim();
 }
 
+function kissSafeLyricText(value) {
+  return promptSafeLyricText(value)
+    .replace(/\[(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.:]\d{1,3})?\]/g, ' ')
+    .replace(/\[(?:intro|outro|verse|pre-chorus|chorus|bridge|hook|refrain|breakdown|prelude|interlude)(?:\s+\d+)?\]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function buildKissPrompt({ creative = {} } = {}) {
+  const lyrics = kissSafeLyricText(creative.lyrics);
+  const brief = promptSafeLyricText(creative.brief);
+  const source = lyrics ? `Use these lyrics as the story source: ${lyrics}.` : 'Use the supplied song and creative intent as the story source.';
+  const intent = brief ? `Creative intent: ${brief}.` : '';
+  return `K.I.S.S.: ${source} ${intent} Turn it into one clear, emotionally coherent narrative for a music video: follow one subject with a concrete desire, an obstacle, a turning point, and a changed ending; turn recurring images into visible choices and action, preserve continuity, and communicate through imagery rather than written words. Return only a compact prose story with no quoted lyric lines, captions, timing markers, or extra prompt sections.`.replace(/\s+/g, ' ').trim();
+}
+
 function listParts(value) {
   return String(value || '').split(/\s*,\s*|\s+and\s+/i).map((item) => item.trim().replace(/^(and|then)\s+/i, '')).filter(Boolean);
 }

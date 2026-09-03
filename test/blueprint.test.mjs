@@ -27,6 +27,9 @@ test('builds a complete planning blueprint without rendering video', () => {
   assert.match(result.artifacts.timingCsv, /scene_id,section_label/);
   assert.match(result.artifacts.shotMarkdown, /Ordered Shot Plan/);
   assert.match(result.artifacts.shotTimingCsv, /shot_id,scene_block_id/);
+  assert.match(result.kissPrompt, /^K\.I\.S\.S\.:/);
+  assert.equal(result.artifacts.kissPrompt, result.kissPrompt);
+  assert.match(result.artifacts.markdown, /## K\.I\.S\.S\. prompt/);
 });
 
 test('keeps lyric narrative connected through the paid blueprint artifacts without quote wrappers', () => {
