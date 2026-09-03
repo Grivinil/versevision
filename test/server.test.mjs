@@ -70,9 +70,9 @@ test('serves the human-facing landing page and studio with SEO metadata', async 
     const address = server.address();
     const pages = [
       { path: '/', required: /Try a free preview/ },
-      { path: '/studio', required: /Generate free preview/, also: /Reset for new song/ }
+      { path: '/studio', required: /Generate free preview/, also: /Reset for new song/, trial: /Input Code for full trial/ }
     ];
-    for (const { path, required, also } of pages) {
+    for (const { path, required, also, trial } of pages) {
       const response = await fetch(`http://127.0.0.1:${address.port}${path}`);
       const body = await response.text();
       assert.equal(response.status, 200);
@@ -80,6 +80,7 @@ test('serves the human-facing landing page and studio with SEO metadata', async 
       assert.match(body, /VerseVision/);
       assert.match(body, required);
       if (also) assert.match(body, also);
+      if (trial) assert.match(body, trial);
       assert.match(body, /rel="canonical"/);
       assert.match(body, /property="og:image"/);
       assert.match(body, /application\/ld\+json/);
@@ -201,6 +202,32 @@ test('full blueprint route can be activated only with an injected payment verifi
     assert.equal(response.status, 200);
     assert.equal(body.schema, 'versevision/blueprint/v1');
     assert.equal(body.status, 'complete');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('full blueprint route accepts the configured trial code without invoking payment', async () => {
+  let paymentCalls = 0;
+  const server = createVerseVisionServer({
+    port: 0,
+    host: '127.0.0.1',
+    blueprintEnabled: true,
+    trialCode: 'local-trial-code',
+    paymentVerifier: async () => { paymentCalls += 1; return { ok: false }; }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    const form = new FormData();
+    form.append('spec', JSON.stringify({ schema: 'versevision/blueprint-request/v1', source: { kind: 'upload', title: 'Trial blueprint test' } }));
+    form.append('audio', new Blob([makeSilentWav()], { type: 'audio/wav' }), 'track.wav');
+    const response = await fetch(`http://127.0.0.1:${address.port}/v1/blueprint`, { method: 'POST', headers: { 'x-versevision-trial-code': 'local-trial-code' }, body: form });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.schema, 'versevision/blueprint/v1');
+    assert.equal(body.status, 'complete');
+    assert.equal(paymentCalls, 0);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

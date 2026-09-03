@@ -1,6 +1,6 @@
 ﻿import { createServer as createHttpServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { analyzeAudioBufferAsync, MAX_AUDIO_BYTES } from './audio.mjs';
 import { fetchAudioUrl } from './ingest.mjs';
 import { parseMultipartBody } from './multipart.mjs';
@@ -253,17 +253,29 @@ async function handleAlignmentJobCreate(request, response, { enabled, transcript
   }
 }
 
-async function handleBlueprint(request, response, { blueprintEnabled, paymentVerifier, acousticAligner } = {}) {
+function matchesTrialCode(candidate, configuredCode) {
+  const supplied = typeof candidate === 'string' ? candidate.trim() : '';
+  const expected = typeof configuredCode === 'string' ? configuredCode.trim() : '';
+  if (!supplied || !expected) return false;
+  const suppliedBytes = Buffer.from(supplied, 'utf8');
+  const expectedBytes = Buffer.from(expected, 'utf8');
+  return suppliedBytes.length === expectedBytes.length && timingSafeEqual(suppliedBytes, expectedBytes);
+}
+
+async function handleBlueprint(request, response, { blueprintEnabled, paymentVerifier, trialCode, acousticAligner } = {}) {
   const id = requestId();
   if (!blueprintEnabled) return sendError(response, 501, id, 'blueprint_generation_pending', 'Full blueprint generation is prepared but disabled until payment enablement is explicitly configured.', undefined, false);
-  if (typeof paymentVerifier !== 'function') return sendError(response, 501, id, 'payment_adapter_not_configured', 'Full blueprint generation requires an injected x402 payment verifier.', undefined, false);
   try {
     const { input, uploadedAudio } = await parseRequestPayload(request);
     const validation = validateBlueprintRequest(input);
     if (!validation.ok) return sendJson(response, 400, { schema: 'versevision/error/v1', requestId: id, error: { code: 'invalid_request', message: 'Request failed schema validation.', field: validation.errors[0]?.path, retryable: false }, details: validation.errors });
     if (input.alignment?.mode === 'acoustic') return sendError(response, 400, id, 'acoustic_alignment_requires_job', 'Use POST /v1/alignment/jobs for acoustic alignment.', 'alignment.mode', false);
-    const payment = await paymentVerifier({ request, requestId: id, input });
-    if (!payment?.ok) return sendError(response, payment?.statusCode || 402, id, 'payment_required', payment?.message || 'A valid x402 payment is required for the full blueprint.', undefined, true);
+    const trial = matchesTrialCode(request.headers['x-versevision-trial-code'], trialCode);
+    if (!trial) {
+      if (typeof paymentVerifier !== 'function') return sendError(response, 501, id, 'payment_adapter_not_configured', 'Full blueprint generation requires an injected x402 payment verifier or a configured trial code.', undefined, false);
+      const payment = await paymentVerifier({ request, requestId: id, input });
+      if (!payment?.ok) return sendError(response, payment?.statusCode || 402, id, 'payment_required', payment?.message || 'A valid x402 payment is required for the full blueprint.', undefined, true);
+    }
     const analysis = await analyzeRequestInput(input, uploadedAudio, { acousticAligner });
     return sendJson(response, 200, buildBlueprintResponse({ id, input, analysis }));
   } catch (error) {
@@ -271,7 +283,7 @@ async function handleBlueprint(request, response, { blueprintEnabled, paymentVer
   }
 }
 
-export function createVerseVisionServer({ port = Number(process.env.PORT || DEFAULT_PORT), host = process.env.HOST || DEFAULT_HOST, blueprintEnabled = process.env.VERSEVISION_BLUEPRINT_ENABLED === '1', alignmentJobsEnabled = process.env.VERSEVISION_ALIGNMENT_JOBS_ENABLED === '1', transcriptionBenchmarkEnabled = process.env.VERSEVISION_TRANSCRIPTION_BENCHMARK === '1', paymentVerifier, acousticAligner: configuredAcousticAligner } = {}) {
+export function createVerseVisionServer({ port = Number(process.env.PORT || DEFAULT_PORT), host = process.env.HOST || DEFAULT_HOST, blueprintEnabled = process.env.VERSEVISION_BLUEPRINT_ENABLED === '1', alignmentJobsEnabled = process.env.VERSEVISION_ALIGNMENT_JOBS_ENABLED === '1', transcriptionBenchmarkEnabled = process.env.VERSEVISION_TRANSCRIPTION_BENCHMARK === '1', paymentVerifier, trialCode = process.env.VERSEVISION_TRIAL_CODE, acousticAligner: configuredAcousticAligner } = {}) {
   let acousticAligner = null;
   try {
     acousticAligner = configuredAcousticAligner || createWhisperXAligner();
@@ -316,7 +328,7 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
           preview: { method: 'POST', path: '/v1/blueprint/preview', payment: 'none' },
           alignmentJob: { method: 'POST', path: '/v1/alignment/jobs', payment: 'not_enabled', enabled: Boolean(alignmentJobsEnabled && acousticAligner) },
           alignmentStatus: { method: 'GET', path: '/v1/alignment/jobs/{jobId}', payment: 'none' },
-          blueprint: { method: 'POST', path: '/v1/blueprint', payment: 'x402', enabled: Boolean(blueprintEnabled && typeof paymentVerifier === 'function') }
+          blueprint: { method: 'POST', path: '/v1/blueprint', payment: 'x402_or_trial_code', enabled: Boolean(blueprintEnabled && (typeof paymentVerifier === 'function' || String(trialCode || '').trim())) }
         }
       });
     }
@@ -337,7 +349,7 @@ export function createVerseVisionServer({ port = Number(process.env.PORT || DEFA
       return sendJson(response, 200, alignmentJobs.publicView(job));
     }
     if (request.method === 'POST' && route === '/v1/blueprint/preview') return void handlePreview(request, response).catch((error) => sendError(response, 500, requestId(), 'internal_error', error.message, undefined, true));
-    if (request.method === 'POST' && route === '/v1/blueprint') return void handleBlueprint(request, response, { blueprintEnabled, paymentVerifier });
+    if (request.method === 'POST' && route === '/v1/blueprint') return void handleBlueprint(request, response, { blueprintEnabled, paymentVerifier, trialCode });
     return sendError(response, 404, requestId(), 'not_found', 'Route not found.', undefined, false);
   });
   server.port = port;
